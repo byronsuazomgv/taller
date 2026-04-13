@@ -42,25 +42,18 @@ window._fb = {
   auth: fbAuth, db: fbDb
 };
 
-// ──────────────────────────────────────────
-// CLOUD SAVE: divide bookings por nivel + guarda email usuario
-// ──────────────────────────────────────────
 window.saveToCloud = async function(uid) {
   if (!uid || !fbDb) return;
   try {
     const user = window._currentUser;
     const userEmail = user ? (user.email || '') : '';
-
-    // Separar bookings por nivel
     const bookingsBasica = {};
     const bookingsMedia  = {};
     Object.entries(window._appData.bookings || {}).forEach(([k, v]) => {
       if (v && v.level === 'basica') bookingsBasica[k] = v;
       else if (v && v.level === 'media') bookingsMedia[k] = v;
     });
-
     const ref = doc(fbDb, 'users', uid, 'data', 'main');
-    // NO merge:true — sobreescribir completamente para que las eliminaciones se reflejen en Firestore
     await setDoc(ref, {
       cfg:             window._appCfg   || null,
       bookings:        window._appData.bookings || {},
@@ -88,7 +81,6 @@ window.loadCloudData = async function(uid) {
       if (d.tickets)  { window._appData.tickets  = d.tickets;  LSS('tickets',  d.tickets);  }
       if (d.notified) { window._appData.notified = d.notified; LSS('notified', d.notified); }
       if (d.notes)    { window._appData.notes    = d.notes;    LSS('notes',    d.notes);    }
-      if (d.notes)    { window._appData.notes    = d.notes;    LSS('notes',    d.notes);    }
     }
     if (window._unsubSync) window._unsubSync();
     window._unsubSync = onSnapshot(ref, (snap2) => {
@@ -98,7 +90,6 @@ window.loadCloudData = async function(uid) {
         if (d2.cfg)      window._appCfg = d2.cfg;
         if (d2.bookings) window._appData.bookings = d2.bookings;
         if (d2.tickets)  window._appData.tickets  = d2.tickets;
-        if (d2.notes)    window._appData.notes    = d2.notes;
         if (d2.notes)    window._appData.notes    = d2.notes;
         if (window._appMounted) window._appMounted();
       }
@@ -116,9 +107,6 @@ if (fbAuth) {
       window.showApp();
     } else {
       window._currentUser = null;
-      if (!window._guestMode) {
-        // Don't force auth screen — let portal handle it
-      }
     }
   });
 }
@@ -224,12 +212,6 @@ button,input,select{font-family:inherit;}
 .s-off{background:rgba(254,226,226,.9);color:#991b1b;}
 .s-ing{background:rgba(254,243,199,.9);color:#92400e;}
 
-/* notif status indicator */
-.notif-status{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;}
-.ns-ok{background:rgba(209,250,229,.9);color:#065f46;}
-.ns-warn{background:rgba(254,243,199,.9);color:#92400e;}
-.ns-err{background:rgba(254,226,226,.9);color:#991b1b;}
-
 .tab-bar{display:flex;gap:8px;margin-bottom:12px;}
 .tab{flex:1;padding:10px 6px;text-align:center;font-size:14px;font-weight:500;border-radius:var(--r);border:1.5px solid var(--gray-bd);background:var(--card);color:var(--tx3);cursor:pointer;transition:all .15s;}
 .tab.ab{background:var(--blue-lt);border-color:#93c5fd;color:var(--blue-tx);}
@@ -308,15 +290,25 @@ button,input,select{font-family:inherit;}
 .notif-banner{background:var(--amber-lt);border:1px solid #fcd34d;border-radius:var(--rs);padding:10px 14px;font-size:13px;color:var(--amber-tx);margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
 .notif-banner button{background:var(--amber);color:#fff;border:none;border-radius:var(--rs);padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;}
 
+/* GAS Status Banner */
+.gas-banner{
+  background:linear-gradient(135deg,#f0fdf4,#dcfce7);
+  border:1.5px solid #86efac;border-radius:var(--rs);
+  padding:10px 14px;font-size:12px;color:#166534;
+  margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+}
+.gas-banner.error{background:linear-gradient(135deg,#fef2f2,#fee2e2);border-color:#fca5a5;color:#991b1b;}
+.gas-banner.warn{background:linear-gradient(135deg,#fffbeb,#fef3c7);border-color:#fcd34d;color:#92400e;}
+
 /* Notif log panel */
-.notif-log{background:#f8fafc;border:1px solid var(--gray-bd);border-radius:var(--rs);padding:10px 14px;font-size:12px;color:var(--tx3);max-height:120px;overflow-y:auto;font-family:'DM Mono',monospace;}
-.notif-log .nl-item{padding:3px 0;border-bottom:1px solid #eee;}
+.notif-log{background:#f8fafc;border:1px solid var(--gray-bd);border-radius:var(--rs);padding:10px 14px;font-size:12px;color:var(--tx3);max-height:160px;overflow-y:auto;font-family:'DM Mono',monospace;}
+.notif-log .nl-item{padding:3px 0;border-bottom:1px solid #eee;line-height:1.4;}
 .notif-log .nl-ok{color:var(--green-tx);}
 .notif-log .nl-err{color:var(--red-tx);}
+.notif-log .nl-warn{color:var(--amber-tx);}
 
 /* ─── NOTES ─── */
 .tab.an{background:#fef9c3;border-color:#fde047;color:#854d0e;}
-.tab.awe{background:#f5f3ff;border-color:#c4b5fd;color:#5b21b6;}
 .nota-card{background:#fff;border:1.5px solid var(--gray-bd);border-radius:var(--r);padding:0;margin-bottom:10px;overflow:hidden;transition:box-shadow .15s;}
 .nota-card:focus-within{box-shadow:0 0 0 2px #93c5fd;border-color:#3b82f6;}
 .nota-header{display:flex;align-items:center;gap:8px;padding:10px 12px 6px;border-bottom:1px solid var(--gray-bd);}
@@ -332,14 +324,12 @@ button,input,select{font-family:inherit;}
 .app{
   max-width:1100px;margin:0 auto;padding:10px;
   height:100vh;flex-direction:column;overflow:hidden;
-  /* display is controlled by JS */
 }
 .app-body{flex:1;overflow-y:auto;overflow-x:hidden;padding-bottom:8px;}
 .header{flex-shrink:0;border-radius:var(--r);padding:10px 14px;margin-bottom:8px;}
 .tab-bar{flex-shrink:0;display:flex;gap:6px;margin-bottom:8px;}
 .tab{flex:1;padding:8px 4px;text-align:center;font-size:13px;font-weight:500;border-radius:var(--r);border:1.5px solid var(--gray-bd);background:var(--card);color:var(--tx3);cursor:pointer;transition:all .15s;white-space:nowrap;}
 
-/* Scrollable calendar cell area */
 .cal-wrap{overflow-x:auto;overflow-y:visible;position:relative;-webkit-overflow-scrolling:touch;}
 .cal-wrap-inner{transform-origin:top left;will-change:transform;display:inline-block;min-width:100%;}
 .zoom-controls{display:flex;align-items:center;gap:2px;background:rgba(255,255,255,.95);border:1px solid var(--gray-bd);border-radius:20px;padding:3px 6px;box-shadow:0 1px 4px rgba(0,0,0,.1);}
@@ -381,16 +371,14 @@ button,input,select{font-family:inherit;}
 <body>
 
 <!-- ══════════════════════════════════════════
-     PORTAL — MINIMALISTA
+     PORTAL
 ══════════════════════════════════════════ -->
 <div id="portalScreen" style="display:flex">
 <style>
 #portalScreen{
   min-height:100vh;flex-direction:column;align-items:center;justify-content:center;
-  background:#f8f9fc;
-  position:relative;overflow:hidden;
+  background:#f8f9fc;position:relative;overflow:hidden;
 }
-/* Sutil degradado de fondo */
 #portalScreen::before{
   content:'';position:absolute;inset:0;
   background:
@@ -399,42 +387,22 @@ button,input,select{font-family:inherit;}
   pointer-events:none;
 }
 .portal-card{
-  position:relative;z-index:2;
-  background:#fff;border:1px solid #e5e7eb;border-radius:20px;
-  padding:44px 40px 36px;
-  width:100%;max-width:380px;
+  position:relative;z-index:2;background:#fff;border:1px solid #e5e7eb;border-radius:20px;
+  padding:44px 40px 36px;width:100%;max-width:380px;
   box-shadow:0 4px 32px rgba(0,0,0,.07);
-  animation:portalIn .4s cubic-bezier(.34,1.4,.64,1) both;
-  text-align:center;
+  animation:portalIn .4s cubic-bezier(.34,1.4,.64,1) both;text-align:center;
 }
 @keyframes portalIn{from{opacity:0;transform:translateY(18px) scale(.97)}to{opacity:1;transform:none}}
-.portal-icon{
-  width:60px;height:60px;border-radius:16px;
-  background:linear-gradient(135deg,#1a56db,#1d8cf8);
-  display:inline-flex;align-items:center;justify-content:center;
-  font-size:28px;margin-bottom:20px;
-  box-shadow:0 6px 20px rgba(26,86,219,.28);
-}
+.portal-icon{width:60px;height:60px;border-radius:16px;background:linear-gradient(135deg,#1a56db,#1d8cf8);display:inline-flex;align-items:center;justify-content:center;font-size:28px;margin-bottom:20px;box-shadow:0 6px 20px rgba(26,86,219,.28);}
 .portal-title{font-size:20px;font-weight:700;color:#111827;letter-spacing:-.02em;margin-bottom:6px;}
 .portal-sub{font-size:13px;color:#9ca3af;margin-bottom:32px;line-height:1.5;}
-.portal-divider{height:1px;background:#f3f4f6;margin:20px 0;}
-.portal-btn-primary{
-  width:100%;padding:13px;font-size:15px;font-weight:700;border:none;border-radius:10px;cursor:pointer;
-  background:linear-gradient(135deg,#1a56db,#1d8cf8);color:#fff;
-  box-shadow:0 4px 16px rgba(26,86,219,.3);transition:opacity .15s,transform .1s;
-  margin-bottom:10px;display:block;
-}
+.portal-btn-primary{width:100%;padding:13px;font-size:15px;font-weight:700;border:none;border-radius:10px;cursor:pointer;background:linear-gradient(135deg,#1a56db,#1d8cf8);color:#fff;box-shadow:0 4px 16px rgba(26,86,219,.3);transition:opacity .15s,transform .1s;margin-bottom:10px;display:block;}
 .portal-btn-primary:hover{opacity:.9;}
 .portal-btn-primary:active{transform:scale(.98);}
-.portal-btn-secondary{
-  width:100%;padding:12px;font-size:14px;font-weight:500;cursor:pointer;
-  background:#f3f4f6;border:none;border-radius:10px;
-  color:#4b5563;transition:background .15s;display:block;
-}
+.portal-btn-secondary{width:100%;padding:12px;font-size:14px;font-weight:500;cursor:pointer;background:#f3f4f6;border:none;border-radius:10px;color:#4b5563;transition:background .15s;display:block;}
 .portal-btn-secondary:hover{background:#e9eaec;}
 .portal-hint{font-size:11px;color:#d1d5db;margin-top:18px;}
 </style>
-
 <div class="portal-card">
   <div class="portal-icon">🖥️</div>
   <div class="portal-title">Taller de Computación</div>
@@ -444,7 +412,6 @@ button,input,select{font-family:inherit;}
   <div class="portal-hint">Lun–Vie · Básica &amp; Media · Sistema de Alertas</div>
 </div>
 </div>
-<!-- FIN PORTAL -->
 
 <div id="authScreen">
   <div class="auth-card">
@@ -462,7 +429,6 @@ button,input,select{font-family:inherit;}
       <div class="auth-tab" id="tabReg" onclick="switchTab('reg')">Crear cuenta</div>
     </div>
     <div class="auth-err" id="authErr"></div>
-
     <div id="panelLogin">
       <div class="fr"><label>Correo electrónico</label>
         <input class="inp" id="lEmail" type="email" placeholder="tucorreo@gmail.com" autocomplete="email"/>
@@ -474,7 +440,6 @@ button,input,select{font-family:inherit;}
       <div class="auth-sep"><span>o</span></div>
       <button class="btn-auth ghost" onclick="doGuest()">Continuar sin cuenta (local)</button>
     </div>
-
     <div id="panelReg" style="display:none">
       <div class="fr"><label>Nombre completo</label>
         <input class="inp" id="rName" type="text" placeholder="Ej: María González"/>
@@ -529,6 +494,18 @@ button,input,select{font-family:inherit;}
 
 <script>
 // ══════════════════════════════════════════
+// CONSTANTES FIJAS — GAS URL fijado permanentemente
+// ══════════════════════════════════════════
+const FIXED_GAS_URL = 'https://script.google.com/macros/s/AKfycbznQRLWH78spmEY0O0xAYGdDiAD2pn8YpitxsNeuv-crWGYTpfCFcEN2GMA7kN1GsRb/exec';
+
+// EmailJS config
+const EJS = {
+  publicKey:  '9IkGVkX0OIP3UILkN',
+  serviceId:  'service_7gr4ldl',
+  templateId: 'template_8qka8g4'
+};
+
+// ══════════════════════════════════════════
 // GLOBALS
 // ══════════════════════════════════════════
 window._appCfg  = null;
@@ -541,15 +518,19 @@ window._appMounted  = null;
 const LS  = k => { try{ return localStorage.getItem('tc3_'+k); }catch(e){ return null; } };
 const LSS = (k,v) => { try{ localStorage.setItem('tc3_'+k, typeof v==='string'?v:JSON.stringify(v)); }catch(e){} };
 
-// Log de notificaciones para debug
+// Log de notificaciones
 window._notifLog = [];
-function addNotifLog(msg, ok=true){
+function addNotifLog(msg, type='ok'){
+  // type: 'ok' | 'err' | 'warn'
   const ts = new Date().toLocaleTimeString('es-CL');
-  window._notifLog.unshift({ msg, ok, ts });
-  if(window._notifLog.length > 30) window._notifLog.pop();
-  // Actualizar panel si está abierto
+  window._notifLog.unshift({ msg, type, ts });
+  if(window._notifLog.length > 50) window._notifLog.pop();
   const nl = document.getElementById('notifLogPanel');
   if(nl) renderNotifLog();
+  // También a consola
+  if(type==='err') console.error('[Notif]', msg);
+  else if(type==='warn') console.warn('[Notif]', msg);
+  else console.log('[Notif]', msg);
 }
 
 // ══════════════════════════════════════════
@@ -584,10 +565,13 @@ const DEF_M=[
 // ══════════════════════════════════════════
 let cfg  = null;
 let data = window._appData;
-let ui   = { level:'basica', weekOffset:0, pendingSlot:null, calZoom:3 };
-let ejsReady=false, GAS_URL='';
+let ui   = { level:'basica', weekOffset:0, pendingSlot:null, calZoom:3, weLvl:'basica' };
+let ejsReady = false;
 
-// Zoom levels: scale values mapped to indices 1-5
+// GAS_URL: siempre usa la URL fija, ignora localStorage para no haber conflictos
+let GAS_URL = FIXED_GAS_URL;
+
+// Zoom levels
 const ZOOM_SCALES=[0.6, 0.78, 1.0, 1.25, 1.55];
 
 function applyZoom(){
@@ -595,48 +579,32 @@ function applyZoom(){
   ['calGridWrap','calGridWEWrap'].forEach(id => {
     const inner = document.getElementById(id);
     if(!inner) return;
-    const outer = inner.parentElement; // .cal-wrap
+    const outer = inner.parentElement;
     if(!outer) return;
-
-    // 1. Reset transform so we can measure natural dimensions
     inner.style.transform = '';
     inner.style.width = '';
     inner.style.height = '';
-
-    // 2. Get natural size after reset
     const naturalW = inner.scrollWidth;
     const naturalH = inner.scrollHeight;
-
-    // 3. Apply scale via transform
     inner.style.transform = `scale(${scale})`;
     inner.style.transformOrigin = 'top left';
-
-    // 4. Adjust inline-block inner width/height so outer knows the real painted size
     inner.style.width  = `${naturalW}px`;
     inner.style.height = `${Math.ceil(naturalH * scale)}px`;
-
-    // 5. Set outer height to the scaled height so card doesn't collapse
     outer.style.height = `${Math.ceil(naturalH * scale)}px`;
-    // For zoom-out: if scaled width < outer width, center; else allow horizontal scroll
     const scaledW = naturalW * scale;
     outer.style.overflowX = scaledW > outer.clientWidth ? 'auto' : 'hidden';
   });
-
-  // Update all zoom labels + button states
   document.querySelectorAll('.zoom-level').forEach(el => {
     el.textContent = `${Math.round(scale * 100)}%`;
   });
   document.querySelectorAll('.zoom-btn[data-dir="in"]').forEach(b  => b.disabled = ui.calZoom >= 5);
   document.querySelectorAll('.zoom-btn[data-dir="out"]').forEach(b => b.disabled = ui.calZoom <= 1);
-
-  // Persist zoom choice
   try{ localStorage.setItem('tc3_zoom', ui.calZoom); }catch(e){}
 }
 
 function zoomIn()  { if(ui.calZoom < 5){ ui.calZoom++; applyZoom(); } }
 function zoomOut() { if(ui.calZoom > 1){ ui.calZoom--; applyZoom(); } }
 
-// ── Pinch-to-zoom touch support (init after DOM ready) ──
 function initPinch(){
   let _lastDist = null;
   document.addEventListener('touchstart', e => {
@@ -660,8 +628,6 @@ function initPinch(){
     }
   }, {passive:true});
   document.addEventListener('touchend', () => { _lastDist = null; }, {passive:true});
-
-  // Restore persisted zoom
   try{
     const saved = parseInt(localStorage.getItem('tc3_zoom'));
     if(saved >= 1 && saved <= 5) ui.calZoom = saved;
@@ -674,7 +640,6 @@ function loadAll(){
   try{ data.bookings=window._appData.bookings||JSON.parse(LS('bookings')||'{}'); }catch(e){}
   try{ data.tickets =window._appData.tickets ||JSON.parse(LS('tickets') ||'{}'); }catch(e){}
   try{ data.notified=window._appData.notified||JSON.parse(LS('notified')||'{}'); }catch(e){}
-  try{ data.notes   =window._appData.notes   ||JSON.parse(LS('notes')   ||'{}'); }catch(e){}
   try{ data.notes   =window._appData.notes   ||JSON.parse(LS('notes')   ||'{}'); }catch(e){}
 }
 function saveData(){
@@ -751,20 +716,19 @@ window.showApp=function(){
     renderSetup();
   }
   window._appMounted=renderMain;
-  startNotifEngine();
+  // Inicializar EmailJS primero, luego arrancar el motor de notificaciones
+  initEmailJS(() => {
+    startNotifEngine();
+  });
   setInterval(()=>{ if(!window._guestMode) cloudSave(); },120000);
-  loadGASUrl();
   requestNotifPermission();
+  // Sincronizar GAS con los bookings actuales al iniciar
+  setTimeout(() => syncToGAS(), 3000);
 };
 
 window.addEventListener('load',()=>{
   setTimeout(()=>{
-    if(window._currentUser){
-      // Already logged in via Firebase onAuthStateChanged
-    } else if(window._guestMode){
-      // guest mode
-    } else {
-      // Show portal — user will decide to log in or go as guest
+    if(!window._currentUser && !window._guestMode){
       document.getElementById('portalScreen').style.display='flex';
     }
   },2500);
@@ -813,7 +777,7 @@ async function doLogout(){
   if(window._guestMode){ window._guestMode=false; window.showAuthScreen(); return; }
   try{
     if(window._unsubSync) window._unsubSync();
-    if(window._notifInterval){ clearInterval(window._notifInterval); window._notifInterval=null; }
+    stopNotifEngine();
     await window._fb.fns.signOut(window._fb.auth);
   }catch(e){ console.error(e); }
 }
@@ -822,7 +786,6 @@ async function doLogout(){
 // UTILS
 // ══════════════════════════════════════════
 const DAYS=['Lun','Mar','Mié','Jue','Vie'];
-const DAYS_WE=['Sáb','Dom'];
 
 function toAmPm(t){
   if(!t||typeof t!=='string') return t||'';
@@ -853,7 +816,7 @@ function isPastSlot(d,bi,level){
   const bl=getBlocks(level)[bi]; if(!bl||bl.isBreak) return false;
   const [h,m]=bl.end.split(':').map(Number);
   const t=new Date(d); t.setHours(h,m,0,0);
-  return t<new Date()&&dStr(d)<=dStr(new Date());
+  return t<new Date();
 }
 function showToast(msg,dur=2500){
   const t=document.getElementById('toast');
@@ -946,7 +909,7 @@ function renderSetup(){
           <option value="0" ${sd.minutes===0?'selected':''}>Solo aviso de 1 min (abrir sala)</option>
           ${[5,10,15,20,30].map(n=>`<option value="${n}" ${n===sd.minutes?'selected':''}>${n} minutos antes + 1 min</option>`).join('')}
         </select>
-        <div style="font-size:11px;color:var(--tx3);margin-top:5px">✉️ Siempre recibirás un correo <b>1 minuto antes</b> para abrir el taller. Si seleccionas un aviso adicional, recibirás ese también.</div>
+        <div style="font-size:11px;color:var(--tx3);margin-top:5px">✉️ Siempre recibirás un correo <b>1 minuto antes</b> para abrir el taller.</div>
       </div>
       <div class="btn-row" style="justify-content:space-between;margin-top:16px">
         <button class="btn-ghost" onclick="ss=1;renderSetup()">← Atrás</button>
@@ -1001,13 +964,12 @@ function renderMain(){
   const dates=getWeekDates(ui.weekOffset);
   const datesWE=getWeekendDates(ui.weekOffset);
   const f=dates[0],l=dates[4];
-  const fw=datesWE[0],lw=datesWE[1];
   const wl=`${f.getDate()}/${f.getMonth()+1} — ${l.getDate()}/${l.getMonth()+1}/${l.getFullYear()}`;
-  const wlWE=`Sáb ${fw.getDate()}/${fw.getMonth()+1} — Dom ${lw.getDate()}/${lw.getMonth()+1}/${lw.getFullYear()}`;
   const hd=new Date().toLocaleDateString('es-CL',{weekday:'long',day:'numeric',month:'long'});
   const needPerm=('Notification' in window) && Notification.permission==='default';
   const syncLabel=window._guestMode?'⚡ Solo local':'☁️ Nube';
   const syncCls  =window._guestMode?'sync-badge s-off':'sync-badge s-ok';
+  const gasOk = !!GAS_URL;
 
   document.getElementById('mainView').innerHTML=`
     <div class="header" style="position:sticky;top:0;z-index:50;margin-bottom:8px;border-radius:var(--r)">
@@ -1017,6 +979,9 @@ function renderMain(){
       </div>
       <div class="hdr-btns">
         <span class="${syncCls}" id="syncBadge">${syncLabel}</span>
+        <span style="background:${gasOk?'rgba(209,250,229,.9)':'rgba(254,226,226,.9)'};color:${gasOk?'#065f46':'#991b1b'};padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;">
+          ${gasOk?'☁️ GAS Activo':'⚠️ Sin GAS'}
+        </span>
         <button class="hdr-btn" onclick="exportPDF()">📄 PDF</button>
         <div class="user-menu" id="userMenu">
           <div class="user-chip" onclick="toggleUD()">
@@ -1028,11 +993,13 @@ function renderMain(){
             <div class="ud-sep"></div>
             <div class="ud-item" onclick="testEmail()">📧 Probar notificación</div>
             <div class="ud-item" onclick="showCfg()">⚙️ Configuración</div>
+            <div class="ud-sep"></div>
+            <div class="ud-item danger" onclick="doLogout()">← Cerrar sesión</div>
           </div>
         </div>
       </div>
     </div>
-    ${needPerm?`<div class="notif-banner" style="margin:0 0 8px;position:sticky;top:60px;z-index:39">🔔 Activa las notificaciones <button onclick="requestNotifPermission()">Activar</button></div>`:''}
+    ${needPerm?`<div class="notif-banner" style="margin:0 0 8px;position:sticky;top:60px;z-index:39">🔔 Activa las notificaciones del navegador <button onclick="requestNotifPermission()">Activar</button></div>`:''}
     <div class="tab-bar" style="position:sticky;top:62px;z-index:40;background:var(--bg);padding:4px 0;margin:0 0 8px">
       <div class="tab ${ui.level==='basica'?'ab':''}" onclick="setLevel('basica')">📘 Básica</div>
       <div class="tab ${ui.level==='media'?'am':''}"  onclick="setLevel('media')">📗 Media</div>
@@ -1042,7 +1009,6 @@ function renderMain(){
 
     ${ui.level==='notas'?`<div id="notasView"></div>`:ui.level==='todos'?`<div id="semanaView"></div>`:`
 
-    <!-- ── SECCIÓN LUNES A VIERNES ── -->
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
       <div style="flex:1;height:2px;background:linear-gradient(90deg,var(--blue),transparent)"></div>
       <div style="font-size:12px;font-weight:700;color:var(--blue-tx);background:var(--blue-lt);border:1px solid #93c5fd;border-radius:20px;padding:4px 14px;white-space:nowrap">📅 Lunes a Viernes</div>
@@ -1053,7 +1019,7 @@ function renderMain(){
       <div class="leg"><div class="ldot" style="background:#1a56db"></div>Básica</div>
       <div class="leg"><div class="ldot" style="background:#059669"></div>Media</div>
       <div class="leg"><div class="ldot-sq" style="background:var(--brk-bg)"></div>Recreo</div>
-      <div style="margin-left:auto;font-size:11px;color:var(--tx3)">Clic = agendar · Clic en reserva = editar · Doble clic = eliminar</div>
+      <div style="margin-left:auto;font-size:11px;color:var(--tx3)">Clic = agendar · Clic en reserva = editar</div>
     </div>
     <div class="card" style="padding:10px 12px">
       <div class="week-nav">
@@ -1142,7 +1108,7 @@ function renderGrid(dates){
       } else if(!past){
         inner=`<div class="slot-plus">+</div>`;
       }
-      const oc=(!past&&!bk)?`onclick="openBook('${ds}',${bi},'${dispLv}')"`:(bk?`onclick="openBook('${ds}',${bi},'${bkLv||dispLv}',true)" ondblclick="removeBk('${ck}')"` :'');
+      const oc=(!past&&!bk)?`onclick="openBook('${ds}',${bi},'${dispLv}')"`:(bk?`onclick="openBook('${ds}',${bi},'${bkLv||dispLv}',true)"` :'');
       html+=`<div class="${cls}" ${oc}>${inner}</div>`;
     });
   });
@@ -1153,7 +1119,7 @@ function renderToday(dates){
   const s=document.getElementById('todayCard'); if(!s) return;
   const td=dates.find(d=>isToday(d));
   let html=`<div class="card-title">Clases de hoy</div>`;
-  if(!td){ s.innerHTML=html+`<p style="font-size:13px;color:var(--tx3)">Hoy no es día de semana. Revisa el calendario de fin de semana abajo.</p>`; return; }
+  if(!td){ s.innerHTML=html+`<p style="font-size:13px;color:var(--tx3)">Hoy no es día de semana.</p>`; return; }
   const lvls=ui.level==='todos'?['basica','media']:[ui.level];
   const items=[];
   lvls.forEach(lv=>{
@@ -1176,36 +1142,28 @@ function renderToday(dates){
 }
 
 // ══════════════════════════════════════════
-// FIN DE SEMANA — SISTEMA COMPLETAMENTE SEPARADO
-// Las reservas WE usan prefijos 'wb' (básica) y 'wm' (media)
-// para no mezclarse jamás con las de semana (b/m)
+// FIN DE SEMANA
 // ══════════════════════════════════════════
-
 function weSlotKey(ds, level, bi){
-  // wb = weekend basica, wm = weekend media
   return `${ds}__${level==='basica'?'wb':'wm'}${bi}`;
 }
-
 function getWEBlocks(level){
   if(level==='basica') return cfg.blocksWEBasica || cfg.blocksBasica;
   return cfg.blocksWEMedia || cfg.blocksMedia;
 }
-
 function isPastWESlot(d, bi, level){
   const bl = getWEBlocks(level)[bi];
   if(!bl || bl.isBreak) return false;
   const [h,m] = bl.end.split(':').map(Number);
   const t = new Date(d); t.setHours(h,m,0,0);
-  return t < new Date() && dStr(d) <= dStr(new Date());
+  return t < new Date();
 }
 
-// ── Grilla Sáb–Dom (solo 2 columnas, keys propias) ──
 function renderGridWE(datesWE){
   const g = document.getElementById('calGridWE'); if(!g) return;
   const dispLv = ui.weLvl || 'basica';
   const blocks = getWEBlocks(dispLv);
   const DAYS_WE2 = ['Sábado','Domingo'];
-
   let html = '<div></div>';
   datesWE.forEach((d,i)=>{
     const esHoy = isToday(d);
@@ -1214,12 +1172,9 @@ function renderGridWE(datesWE){
       <div style="font-size:9px;color:#a78bfa;font-weight:400">${d.toLocaleDateString('es-CL',{month:'short'})}</div>
     </div>`;
   });
-
   blocks.forEach((bl,bi)=>{
     if(bl.isBreak){
-      html += `<div class="time-lbl" style="background:#faf5ff">
-        <span style="font-size:8px;color:#7c3aed">${toAmPm(bl.start)}</span>
-      </div>`;
+      html += `<div class="time-lbl" style="background:#faf5ff"><span style="font-size:8px;color:#7c3aed">${toAmPm(bl.start)}</span></div>`;
       datesWE.forEach(()=>{ html += `<div class="slot brk" style="background:#ede9fe;border-color:#c4b5fd"><div class="brk-lbl" style="color:#5b21b6">🌿 ${bl.label}</div></div>`; });
       return;
     }
@@ -1238,7 +1193,7 @@ function renderGridWE(datesWE){
       else          cls += ' can-click';
       html += `<div class="${cls}" style="${!bk&&!past?'border-color:#c4b5fd;':''}"`;
       if(!past&&!bk) html += ` onclick="openWEBook('${ds}',${bi},'${dispLv}')"`;
-      else if(bk)    html += ` onclick="openWEBook('${ds}',${bi},'${dispLv}',true)" ondblclick="removeWEBk('${k}')"`;
+      else if(bk)    html += ` onclick="openWEBook('${ds}',${bi},'${dispLv}',true)"`;
       html += '>';
       if(bk){
         html += `<div style="display:flex;align-items:flex-start;gap:2px">
@@ -1257,11 +1212,9 @@ function renderGridWE(datesWE){
       html += '</div>';
     });
   });
-
   g.innerHTML = html;
 }
 
-// ── Resumen de hoy (fin de semana) ──
 function renderWeekendToday(datesWE){
   const s = document.getElementById('weekendCard'); if(!s) return;
   const td = datesWE.find(d=>isToday(d));
@@ -1287,11 +1240,12 @@ function renderWeekendToday(datesWE){
   s.innerHTML = html + (items.length?items.join(''):`<p style="font-size:13px;color:var(--tx3)">Sin clases agendadas para hoy.</p>`);
 }
 
-// ── Modal de agenda fin de semana ──
 function openWEBook(ds, bi, level, editMode){
   const k   = weSlotKey(ds, level, bi);
   const bk  = editMode ? data.bookings[k] : null;
   ui.pendingWESlot = {ds, bi, level, editMode, editKey:k};
+  ui._saveWE = true;
+  ui.pendingSlot = null;
   const bl  = getWEBlocks(level)[bi];
   const modeLabel = editMode?'Editar':'Agendar';
   document.getElementById('bookTitle').textContent = `${modeLabel} — ${bl.label} (${toAmPm(bl.start)} – ${toAmPm(bl.end)}) 🏖️`;
@@ -1301,9 +1255,6 @@ function openWEBook(ds, bi, level, editMode){
   document.getElementById('bSaveBtn').textContent = editMode?'Guardar cambios ✓':'Agendar ✓';
   const delBtn = document.getElementById('bDeleteBtn');
   if(delBtn) delBtn.style.display = editMode?'':'none';
-  // Flag to save to WE key
-  ui.pendingSlot = null;
-  ui._saveWE = true;
   document.getElementById('bookModal').classList.add('open');
   setTimeout(()=>document.getElementById('bCourse').focus(),100);
 }
@@ -1320,23 +1271,19 @@ function changeWeek(d){ ui.weekOffset+=d; renderMain(); }
 // ══════════════════════════════════════════
 // BOOKING
 // ══════════════════════════════════════════
-function openBook(ds,bi,level,editMode,weMode){
+function openBook(ds,bi,level,editMode){
   const prefix=level==='basica'?'b':'m';
   const key=slotKey(ds,prefix,bi);
   const existingBk=editMode?data.bookings[key]:null;
-  ui.pendingSlot={ds,bi,level,editMode,editKey:key,weMode};
-  // Use WE blocks if we're in weekend mode
-  const blocks=weMode
-    ? (level==='basica'?(cfg.blocksWEBasica||cfg.blocksBasica):(cfg.blocksWEMedia||cfg.blocksMedia))
-    : getBlocks(level);
-  const bl=blocks[bi]||getBlocks(level)[bi];
+  ui.pendingSlot={ds,bi,level,editMode,editKey:key};
+  ui._saveWE = false;
+  const bl=getBlocks(level)[bi];
   const modeLabel=editMode?'Editar':'Agendar';
   document.getElementById('bookTitle').textContent=`${modeLabel} — ${bl.label} (${toAmPm(bl.start)} – ${toAmPm(bl.end)})`;
   document.getElementById('bCourse').value=existingBk?existingBk.course:'';
   document.getElementById('bTeacher').value=existingBk?existingBk.teacher:'';
   document.getElementById('bLevel').value=existingBk?existingBk.level:level;
   document.getElementById('bSaveBtn').textContent=editMode?'Guardar cambios ✓':'Agendar ✓';
-  // Show delete button if editing
   const delBtn=document.getElementById('bDeleteBtn');
   if(delBtn){ delBtn.style.display=editMode?'':'none'; }
   document.getElementById('bookModal').classList.add('open');
@@ -1347,7 +1294,6 @@ function saveBook(){
   const course=document.getElementById('bCourse').value.trim();
   if(!course){ showToast('Ingresa el nombre del curso'); return; }
 
-  // ── Fin de semana: guarda con weSlotKey ──
   if(ui._saveWE && ui.pendingWESlot){
     const {ds,bi,level,editMode,editKey}=ui.pendingWESlot;
     const newLevel=document.getElementById('bLevel').value;
@@ -1360,34 +1306,36 @@ function saveBook(){
     data.bookings[k]={course,level:newLevel,teacher:document.getElementById('bTeacher').value.trim(),ds,bi,prefix:newLevel==='basica'?'wb':'wm',startTime:bl.start,endTime:bl.end,isWE:true};
     saveData(); closeBook(); renderMain();
     showToast(editMode?'✓ Reserva FDS actualizada':'✓ Clase FDS agendada');
+    syncToGAS();
+    setTimeout(checkPendingNotifs, 500);
     return;
   }
 
-  // ── Semana normal ──
-  const {ds,bi,level,editMode,editKey,weMode}=ui.pendingSlot;
+  const {ds,bi,level,editMode,editKey}=ui.pendingSlot;
   const newLevel=document.getElementById('bLevel').value;
   const prefix=newLevel==='basica'?'b':'m';
   const key=slotKey(ds,prefix,bi);
-  const weBlks=weMode
-    ? (newLevel==='basica'?(cfg.blocksWEBasica||cfg.blocksBasica):(cfg.blocksWEMedia||cfg.blocksMedia))
-    : null;
-  const blk=(weBlks&&weBlks[bi])||getBlocks(newLevel)[bi]||getBlocks(level)[bi];
+  const blk=getBlocks(newLevel)[bi]||getBlocks(level)[bi];
   if(editMode && editKey && editKey!==key){
     delete data.bookings[editKey]; delete data.tickets[editKey];
     Object.keys(data.notified).forEach(nk=>{ if(nk.startsWith(editKey)) delete data.notified[nk]; });
   }
   data.bookings[key]={course,level:newLevel,teacher:document.getElementById('bTeacher').value.trim(),ds,bi,prefix,startTime:blk.start,endTime:blk.end};
   saveData(); closeBook(); renderMain();
-  syncToGAS(); showToast(editMode?'✓ Reserva actualizada':'✓ Clase agendada');
-  // Reiniciar notificaciones para que tome en cuenta el nuevo booking
-  if(!editMode){ Object.keys(data.notified).forEach(k=>{ if(k.startsWith(slotKey(ds,prefix,bi))) delete data.notified[k]; }); saveData(); }
+  showToast(editMode?'✓ Reserva actualizada':'✓ Clase agendada');
+  syncToGAS();
+  // Resetear notificaciones para esta reserva nueva
+  if(!editMode){
+    Object.keys(data.notified).forEach(k=>{ if(k.startsWith(slotKey(ds,prefix,bi))) delete data.notified[k]; });
+    saveData();
+  }
   setTimeout(checkPendingNotifs, 500);
 }
 function deleteFromModal(){
   if(ui._saveWE && ui.pendingWESlot){
     const {editKey}=ui.pendingWESlot||{};
     if(!editKey) return;
-    if(!confirm('¿Eliminar esta reserva de fin de semana?')) return;
+    if(!confirm('¿Eliminar esta reserva?')) return;
     closeBook();
     delete data.bookings[editKey]; delete data.tickets[editKey];
     Object.keys(data.notified).forEach(nk=>{ if(nk.startsWith(editKey)) delete data.notified[nk]; });
@@ -1398,13 +1346,9 @@ function deleteFromModal(){
   if(!editKey) return;
   if(!confirm('¿Eliminar esta reserva?')) return;
   closeBook();
-  deleteBookingByKey(editKey);
-  renderMain(); showToast('🗑️ Reserva eliminada');
-}
-function deleteBookingByKey(key){
-  delete data.bookings[key]; delete data.tickets[key];
-  Object.keys(data.notified).forEach(nk=>{ if(nk.startsWith(key)) delete data.notified[nk]; });
-  saveData();
+  delete data.bookings[editKey]; delete data.tickets[editKey];
+  Object.keys(data.notified).forEach(nk=>{ if(nk.startsWith(editKey)) delete data.notified[nk]; });
+  saveData(); renderMain(); showToast('🗑️ Reserva eliminada');
 }
 function tick(key,val){
   data.tickets[key]=data.tickets[key]===val?null:val;
@@ -1429,7 +1373,7 @@ function backMain(){
 function renderNotifLog(){
   const nl=document.getElementById('notifLogPanel'); if(!nl) return;
   if(!window._notifLog.length){ nl.innerHTML='<div style="color:var(--tx3);font-size:11px;padding:4px 0">Sin actividad aún...</div>'; return; }
-  nl.innerHTML=window._notifLog.slice(0,10).map(l=>`<div class="nl-item ${l.ok?'nl-ok':'nl-err'}">[${l.ts}] ${l.msg}</div>`).join('');
+  nl.innerHTML=window._notifLog.slice(0,20).map(l=>`<div class="nl-item nl-${l.type}">[${l.ts}] ${l.msg}</div>`).join('');
 }
 function renderCfg(){
   const v=document.getElementById('configView');
@@ -1441,10 +1385,17 @@ function renderCfg(){
         <button class="hdr-btn" onclick="backMain()">← Volver</button>
       </div>
     </div>
+
+    <!-- GAS Status Banner -->
+    <div class="gas-banner" id="gasBanner">
+      ☁️ <b>Google Apps Script conectado</b> — Los correos se envían aunque tengas la web cerrada.<br>
+      <span style="font-size:11px;opacity:.8">URL fija: ${FIXED_GAS_URL.slice(0,60)}…</span>
+      <button onclick="testGASConnection()" style="margin-left:auto;background:#059669;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;">🔌 Verificar</button>
+    </div>
+
     <div class="card">
       <div class="cfg-title" style="margin-top:0">👤 Cuenta</div>
       <div style="font-size:13px;color:var(--tx2);margin-bottom:4px">Correo de cuenta: <b>${esc(userEmail||'—')}</b></div>
-      <div style="font-size:11px;color:var(--tx3)">Este correo se guarda en Firebase junto a tus reservas.</div>
     </div>
     <div class="card">
       <div class="cfg-title" style="margin-top:0">Establecimiento</div>
@@ -1458,7 +1409,7 @@ function renderCfg(){
           <option value="0" ${cfg.minutes===0?'selected':''}>Solo aviso de 1 min (abrir sala)</option>
           ${[5,10,15,20,30].map(n=>`<option value="${n}" ${n===cfg.minutes?'selected':''}>${n} minutos antes + 1 min</option>`).join('')}
         </select>
-        <div style="font-size:11px;color:var(--tx3);margin-top:5px">✉️ Siempre recibirás un correo <b>1 minuto antes</b> para abrir el taller. El aviso anticipado adicional es opcional.</div>
+        <div style="font-size:11px;color:var(--tx3);margin-top:5px">✉️ Siempre recibirás un correo <b>1 minuto antes</b> para abrir el taller.</div>
       </div>
     </div>
     <div class="cfg-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:12px">
@@ -1477,124 +1428,66 @@ function renderCfg(){
     </div>
 
     <div class="card" style="margin-bottom:12px">
-      <div class="cfg-title" style="margin-top:0;color:#7c3aed">⚡ Google Apps Script — Notificaciones Automáticas</div>
-      <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;padding:12px 14px;margin-bottom:12px;font-size:12px;color:#5b21b6;line-height:1.7">
-        Con el GAS conectado, los correos se envían <b>aunque tengas la web cerrada</b>. El script corre cada minuto en los servidores de Google.
-      </div>
-      <div class="fr"><label>URL del Web App (pega aquí la URL del script desplegado)</label>
-        <input class="inp" id="c_gasurl" placeholder="https://script.google.com/macros/s/.../exec" value="${esc(GAS_URL)}"/>
-      </div>
-      <div id="gasStatusRow" style="margin-top:6px;font-size:12px;color:var(--tx3)">
-        ${GAS_URL ? `<span id="gasStatusBadge" style="display:inline-flex;align-items:center;gap:5px;background:#f0fdf4;border:1px solid #86efac;color:#166534;padding:4px 10px;border-radius:20px;font-weight:600;">⏳ Verificando conexión…</span>` : `<span style="color:var(--tx3)">Sin URL — las notificaciones solo funcionan con la web abierta.</span>`}
-      </div>
-      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn-ghost" style="padding:6px 12px;font-size:12px" onclick="testGASConnection()">🔌 Verificar conexión</button>
-        <button class="btn-ghost" style="padding:6px 12px;font-size:12px" onclick="triggerGASCheck()">▶️ Forzar chequeo ahora</button>
-      </div>
-    </div>
-    <div class="card" style="margin-bottom:12px">
       <div class="cfg-title" style="margin-top:0;color:#0369a1">📬 Log de notificaciones</div>
-      <div style="font-size:11px;color:var(--tx3);margin-bottom:8px">Historial de correos enviados en esta sesión:</div>
+      <div style="font-size:11px;color:var(--tx3);margin-bottom:8px">
+        Historial de envíos en esta sesión — Motor: cheques cada 15s · GAS: cheques cada minuto en servidor
+      </div>
       <div class="notif-log" id="notifLogPanel"></div>
       <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-blue" style="padding:7px 14px;font-size:13px" onclick="testEmail()">📧 Enviar correo de prueba</button>
-        <button class="btn-ghost" style="padding:7px 14px;font-size:13px" onclick="resetNotified()">🔄 Resetear avisos enviados</button>
+        <button class="btn btn-blue" style="padding:7px 14px;font-size:13px" onclick="testEmail()">📧 Correo de prueba</button>
+        <button class="btn-ghost" style="padding:7px 14px;font-size:13px" onclick="triggerGASCheck()">▶️ Forzar chequeo GAS</button>
+        <button class="btn-ghost" style="padding:7px 14px;font-size:13px" onclick="resetNotified()">🔄 Resetear avisos</button>
       </div>
     </div>
+
     <div class="card" style="margin-bottom:12px">
-      <div class="cfg-title" style="margin-top:0;color:#dc2626">🧪 Simulacro — Probar sistema de alertas</div>
+      <div class="cfg-title" style="margin-top:0;color:#dc2626">🧪 Simulacro — Probar alertas</div>
       <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:12px;color:#991b1b;line-height:1.7">
-        Envía una notificación de prueba para verificar que los correos y alertas funcionan correctamente. Puedes disparar una alerta ahora mismo o programarla para cualquier día y hora.
+        Envía una notificación de prueba para verificar que el sistema de correos funciona correctamente.
       </div>
-
-      <div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--gray-bd)">
-        <div style="font-size:12px;font-weight:700;color:var(--tx2);margin-bottom:10px">⚡ Disparo inmediato</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
-          <div>
-            <label style="font-size:11px;font-weight:600;color:var(--tx3);display:block;margin-bottom:4px">Día</label>
-            <select class="inp-sm" id="sim_day">
-              ${(()=>{
-                const opts=[];
-                for(let i=0;i<7;i++){
-                  const d=new Date(); d.setDate(d.getDate()+i);
-                  const ds2=dStr(d);
-                  const label=i===0?'Hoy':i===1?'Mañana':d.toLocaleDateString('es-CL',{weekday:'short',day:'numeric',month:'short'});
-                  opts.push(`<option value="${ds2}">${label}</option>`);
-                }
-                return opts.join('');
-              })()}
-            </select>
-          </div>
-          <div>
-            <label style="font-size:11px;font-weight:600;color:var(--tx3);display:block;margin-bottom:4px">Hora de la clase</label>
-            <input class="inp-sm" type="time" id="sim_time" value="${new Date().toTimeString().slice(0,5)}"/>
-          </div>
-          <div>
-            <label style="font-size:11px;font-weight:600;color:var(--tx3);display:block;margin-bottom:4px">Aviso (min antes)</label>
-            <select class="inp-sm" id="sim_mins">
-              <option value="1">1 min (abrir sala)</option>
-              <option value="5">5 min antes</option>
-              <option value="10">10 min antes</option>
-              <option value="15">15 min antes</option>
-              <option value="20">20 min antes</option>
-              <option value="30">30 min antes</option>
-            </select>
-          </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+        <div>
+          <label style="font-size:11px;font-weight:600;color:var(--tx3);display:block;margin-bottom:4px">Día</label>
+          <select class="inp-sm" id="sim_day">
+            ${(()=>{
+              const opts=[];
+              for(let i=0;i<7;i++){
+                const d=new Date(); d.setDate(d.getDate()+i);
+                const ds2=dStr(d);
+                const label=i===0?'Hoy':i===1?'Mañana':d.toLocaleDateString('es-CL',{weekday:'short',day:'numeric',month:'short'});
+                opts.push(`<option value="${ds2}">${label}</option>`);
+              }
+              return opts.join('');
+            })()}
+          </select>
         </div>
-        <button class="btn" style="background:#dc2626;color:#fff;padding:8px 18px;font-size:13px" onclick="runSimulacro()">🚨 Enviar simulacro ahora</button>
-      </div>
-
-      <div>
-        <div style="font-size:12px;font-weight:700;color:var(--tx2);margin-bottom:10px">⏰ Simulacro programado</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
-          <div>
-            <label style="font-size:11px;font-weight:600;color:var(--tx3);display:block;margin-bottom:4px">Fecha</label>
-            <select class="inp-sm" id="sim_date">
-              ${(()=>{
-                const dias=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
-                const opts=[];
-                for(let i=0;i<7;i++){
-                  const d=new Date(); d.setDate(d.getDate()+i);
-                  const ds2=dStr(d);
-                  const dow=d.getDay();
-                  const label=(i===0?'Hoy — ':i===1?'Mañana — ':'')+dias[dow===0?6:dow-1]+' '+d.getDate()+'/'+String(d.getMonth()+1).padStart(2,'0');
-                  opts.push(`<option value="${ds2}">${label}</option>`);
-                }
-                return opts.join('');
-              })()}
-            </select>
-          </div>
-          <div>
-            <label style="font-size:11px;font-weight:600;color:var(--tx3);display:block;margin-bottom:4px">Hora de la clase</label>
-            <input class="inp-sm" type="time" id="sim_sched_time"/>
-          </div>
-          <div>
-            <label style="font-size:11px;font-weight:600;color:var(--tx3);display:block;margin-bottom:4px">Aviso (min antes)</label>
-            <select class="inp-sm" id="sim_sched_mins">
-              <option value="1">1 min (abrir sala)</option>
-              <option value="5">5 min antes</option>
-              <option value="10">10 min antes</option>
-              <option value="15">15 min antes</option>
-              <option value="20">20 min antes</option>
-              <option value="30">30 min antes</option>
-            </select>
-          </div>
+        <div>
+          <label style="font-size:11px;font-weight:600;color:var(--tx3);display:block;margin-bottom:4px">Hora de la clase</label>
+          <input class="inp-sm" type="time" id="sim_time" value="${new Date().toTimeString().slice(0,5)}"/>
         </div>
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-          <button class="btn" style="background:#d97706;color:#fff;padding:8px 18px;font-size:13px" onclick="scheduleSimulacro()">⏰ Programar simulacro</button>
-          <span id="simSchedStatus" style="font-size:12px;color:var(--tx3)"></span>
+        <div>
+          <label style="font-size:11px;font-weight:600;color:var(--tx3);display:block;margin-bottom:4px">Aviso (min antes)</label>
+          <select class="inp-sm" id="sim_mins">
+            <option value="1">1 min (abrir sala)</option>
+            <option value="5">5 min antes</option>
+            <option value="10">10 min antes</option>
+            <option value="15" selected>15 min antes</option>
+            <option value="20">20 min antes</option>
+            <option value="30">30 min antes</option>
+          </select>
         </div>
       </div>
+      <button class="btn" style="background:#dc2626;color:#fff;padding:8px 18px;font-size:13px" onclick="runSimulacro()">🚨 Enviar simulacro ahora</button>
     </div>
 
     <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap">
-      <div style="display:flex;gap:8px">
-        <button class="btn-ghost" onclick="backMain()">Cancelar</button>
-        <button class="btn btn-blue" onclick="saveCfgView()">Guardar ✓</button>
-      </div>
+      <button class="btn-ghost" onclick="backMain()">Cancelar</button>
+      <button class="btn btn-blue" onclick="saveCfgView()">Guardar ✓</button>
     </div>`;
   renderCBlocks('basica'); renderCBlocks('media');
   renderNotifLog();
+  // Verificar GAS al abrir config
+  setTimeout(testGASConnection, 500);
 }
 function renderCBlocks(lv){
   const arr=lv==='basica'?cfg.blocksBasica:cfg.blocksMedia;
@@ -1618,440 +1511,402 @@ function saveCfgView(){
   cfg.email=document.getElementById('c_email').value.trim()||cfg.email;
   cfg.minutes=parseInt(document.getElementById('c_mins').value);
   if(isNaN(cfg.minutes)) cfg.minutes=0;
-  const gasUrl=document.getElementById('c_gasurl').value.trim();
-  if(gasUrl) saveGASUrl(gasUrl);
   saveCfg(); backMain(); showToast('Configuración guardada ✓');
+  syncToGAS();
 }
 function resetNotified(){
   data.notified={};
   saveData();
   showToast('🔄 Historial de avisos limpiado. Se reenviarán los próximos.');
-  addNotifLog('Historial de avisos reseteado manualmente', true);
+  addNotifLog('Historial de avisos reseteado manualmente', 'warn');
+  renderNotifLog();
 }
 
 // ══════════════════════════════════════════
-// EMAIL + GAS
+// ═══════════ SISTEMA DE EMAILS ═══════════
 // ══════════════════════════════════════════
-const EJS={publicKey:'9IkGVkX0OIP3UILkN',serviceId:'service_7gr4ldl',templateId:'template_8qka8g4'};
 
-function initEmailJS(){
-  if(typeof emailjs==='undefined'){ setTimeout(initEmailJS,500); return; }
-  try{ emailjs.init({publicKey:EJS.publicKey}); ejsReady=true; console.log('[EmailJS] Listo'); }
-  catch(e){ console.error('[EmailJS] Error al iniciar:', e); }
+// ── EmailJS: inicialización con callback ──
+function initEmailJS(callback) {
+  function tryInit(attempts) {
+    if(typeof emailjs !== 'undefined') {
+      try {
+        emailjs.init({ publicKey: EJS.publicKey });
+        ejsReady = true;
+        addNotifLog('EmailJS inicializado correctamente', 'ok');
+        if(callback) callback();
+      } catch(e) {
+        addNotifLog(`Error al iniciar EmailJS: ${e.message}`, 'err');
+      }
+    } else if(attempts > 0) {
+      setTimeout(() => tryInit(attempts - 1), 800);
+    } else {
+      addNotifLog('EmailJS no pudo cargar después de varios intentos', 'err');
+      if(callback) callback(); // Igual arrancar el motor
+    }
+  }
+  tryInit(10); // Hasta 8 segundos de espera
 }
-initEmailJS();
 
-// ── GAS: Notifica al script de un nuevo booking para que empiece a monitorear
-function syncToGAS(){
-  if(!GAS_URL||!cfg) return;
-  fetch(GAS_URL, {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ action:'checkNow' })
-  })
-  .then(r=>r.json())
-  .then(d=>{ if(d.ok) addNotifLog('☁️ GAS sincronizado correctamente', true); })
-  .catch(()=>{
-    fetch(GAS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({action:'checkNow'})
-    }).catch(()=>{});
-  });
+// ── GAS: sincronizar todos los bookings al script ──
+function buildGASPayload() {
+  if(!cfg) return null;
+  // Construir lista completa de clases próximas (hoy + mañana + próximos 7 días)
+  const upcoming = [];
+  const now = new Date();
+  for(let dayOffset = 0; dayOffset <= 7; dayOffset++) {
+    const d = new Date(now);
+    d.setDate(now.getDate() + dayOffset);
+    d.setHours(0,0,0,0);
+    const ds = dStr(d);
+    const dayOfWeek = d.getDay();
+    const isWEDay = dayOfWeek === 0 || dayOfWeek === 6;
+    
+    ['basica','media'].forEach(lv => {
+      const blocks = isWEDay ? getWEBlocks(lv) : getBlocks(lv);
+      blocks.forEach((bl, bi) => {
+        if(bl.isBreak) return;
+        const key = isWEDay
+          ? weSlotKey(ds, lv, bi)
+          : slotKey(ds, lv==='basica'?'b':'m', bi);
+        const bk = data.bookings[key];
+        if(!bk) return;
+        upcoming.push({
+          key,
+          ds,
+          course:    bk.course,
+          teacher:   bk.teacher || '',
+          level:     lv,
+          startTime: bl.start,
+          endTime:   bl.end,
+          blockLabel: bl.label,
+          isWE:      isWEDay
+        });
+      });
+    });
+  }
+  return {
+    action:      'updateBookings',
+    bookings:    upcoming,
+    cfg: {
+      schoolName: cfg.schoolName,
+      email:      cfg.email,
+      minutes:    cfg.minutes
+    },
+    notified:    data.notified,
+    timestamp:   Date.now()
+  };
 }
-function loadGASUrl(){ GAS_URL=localStorage.getItem('tc3_gasurl')||''; }
-function saveGASUrl(url){ GAS_URL=url; localStorage.setItem('tc3_gasurl',url); syncToGAS(); }
 
-// Verifica que el GAS responde y muestra status
-async function testGASConnection(){
-  const urlEl = document.getElementById('c_gasurl');
-  const url   = urlEl ? urlEl.value.trim() : GAS_URL;
-  if(!url){ showToast('Ingresa la URL del Web App primero'); return; }
-  const badge = document.getElementById('gasStatusBadge');
-  if(badge){ badge.style.background='#fef9c3'; badge.style.color='#854d0e'; badge.style.borderColor='#fde047'; badge.textContent='⏳ Verificando…'; }
-  try{
-    const r = await fetch(url + (url.includes('?')?'&':'?') + '_t=' + Date.now());
-    if(!r.ok) throw new Error('HTTP ' + r.status);
-    const d = await r.json();
-    if(d.ok || d.service){
-      if(badge){ badge.style.background='#f0fdf4'; badge.style.borderColor='#86efac'; badge.style.color='#166534'; badge.textContent='✅ GAS conectado — último run: ' + (d.lastRun||'N/A'); }
-      showToast('✅ GAS conectado y funcionando', 4000);
-      addNotifLog('✅ GAS verificado OK — emails enviados total: ' + (d.emailsSentTotal||0), true);
-    } else { throw new Error('Respuesta inesperada'); }
-  } catch(e){
-    if(badge){ badge.style.background='#fef2f2'; badge.style.borderColor='#fca5a5'; badge.style.color='#991b1b'; badge.textContent='❌ No se pudo conectar'; }
-    showToast('❌ No se pudo conectar al GAS. Revisa la URL y que esté publicado como Web App pública.', 6000);
-    addNotifLog('❌ Error GAS: ' + e.message, false);
+async function syncToGAS() {
+  if(!GAS_URL || !cfg) return;
+  const payload = buildGASPayload();
+  if(!payload) return;
+  
+  try {
+    // Primero intentar con CORS normal
+    const r = await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if(r.ok) {
+      const d = await r.json();
+      addNotifLog(`☁️ GAS sincronizado: ${payload.bookings.length} clase(s) próximas`, 'ok');
+      return d;
+    }
+  } catch(e) {
+    // CORS error — usar no-cors (sin respuesta pero sí llega)
+    try {
+      await fetch(GAS_URL, {
+        method:  'POST',
+        mode:    'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(payload)
+      });
+      addNotifLog(`☁️ GAS notificado (no-cors, sin confirmación)`, 'warn');
+    } catch(e2) {
+      addNotifLog(`❌ GAS sync error: ${e2.message}`, 'err');
+    }
   }
 }
 
-// Fuerza un chequeo inmediato en el GAS
-async function triggerGASCheck(){
-  const url = GAS_URL || ((document.getElementById('c_gasurl')||{}).value||'');
-  if(!url){ showToast('Guarda la URL del GAS primero'); return; }
+async function testGASConnection() {
+  const banner = document.getElementById('gasBanner');
+  if(banner){ banner.className='gas-banner warn'; banner.innerHTML=`⏳ <b>Verificando conexión con GAS…</b>`; }
+  try {
+    const r = await fetch(GAS_URL + (GAS_URL.includes('?')?'&':'?') + '_t=' + Date.now());
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    if(d.ok || d.service || d.status) {
+      if(banner){ banner.className='gas-banner'; banner.innerHTML=`✅ <b>GAS conectado y activo</b> — Emails enviados total: ${d.emailsSentTotal||0} · Último run: ${d.lastRun||'N/A'}<br><span style="font-size:11px;opacity:.8">${FIXED_GAS_URL.slice(0,60)}…</span>`; }
+      addNotifLog(`✅ GAS verificado OK — emails total: ${d.emailsSentTotal||0}`, 'ok');
+      showToast('✅ GAS conectado y funcionando', 4000);
+    } else { throw new Error('Respuesta inesperada'); }
+  } catch(e) {
+    if(banner){ banner.className='gas-banner error'; banner.innerHTML=`⚠️ <b>GAS no responde</b> — Puede ser CORS (normal en algunos entornos). Los correos podrían llegar igual.<br><button onclick="triggerGASCheck()" style="margin-top:6px;background:#dc2626;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer">▶️ Forzar chequeo</button>`; }
+    addNotifLog(`⚠️ GAS ping error (posible CORS): ${e.message}`, 'warn');
+  }
+}
+
+async function triggerGASCheck() {
   showToast('▶️ Solicitando chequeo al GAS…', 2000);
-  try{
-    const r = await fetch(url, {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ action:'checkNow' })
+  addNotifLog('▶️ Chequeo manual solicitado', 'ok');
+  try {
+    const r = await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'checkNow', cfg: { email: cfg?.email, schoolName: cfg?.schoolName, minutes: cfg?.minutes } })
     });
     const d = await r.json();
-    showToast('✅ GAS ejecutado: ' + (d.emailsSent||0) + ' correo(s) enviado(s)', 4000);
-    addNotifLog('▶️ Chequeo manual GAS: ' + (d.emailsSent||0) + ' emails', true);
-  } catch(e){
-    fetch(url,{method:'POST',mode:'no-cors',body:JSON.stringify({action:'checkNow'})}).catch(()=>{});
-    showToast('☁️ Solicitud enviada (sin confirmación de respuesta — CORS)', 3000);
+    showToast(`✅ GAS: ${d.emailsSent||0} correo(s) enviado(s)`, 4000);
+    addNotifLog(`▶️ Chequeo GAS completado: ${d.emailsSent||0} emails`, 'ok');
+    renderNotifLog();
+  } catch(e) {
+    // Intentar no-cors
+    fetch(GAS_URL, {
+      method:'POST', mode:'no-cors',
+      body: JSON.stringify({ action:'checkNow' })
+    }).catch(()=>{});
+    showToast('☁️ Solicitud enviada (sin confirmación CORS)', 3000);
+    addNotifLog('▶️ Chequeo enviado en no-cors', 'warn');
   }
 }
 
 function requestNotifPermission(){
   if(!('Notification' in window)) return;
   if(Notification.permission==='default'){
-    Notification.requestPermission().then(p=>{ if(p==='granted') showToast('🔔 Notificaciones activadas'); });
+    Notification.requestPermission().then(p=>{ if(p==='granted') showToast('🔔 Notificaciones del navegador activadas'); });
   }
 }
 
 // ══════════════════════════════════════════
-// MOTOR DE NOTIFICACIONES — MEJORADO
-// El problema central: necesitamos checar CADA MINUTO con precisión
-// y manejar múltiples bloques del mismo curso en el mismo día
+// ═══ MOTOR DE NOTIFICACIONES (CORREGIDO) ══
 // ══════════════════════════════════════════
 
+function stopNotifEngine(){
+  if(window._notifInterval){ clearInterval(window._notifInterval); window._notifInterval=null; }
+}
+
 function startNotifEngine(){
-  // Limpiar intervalo previo si existe
-  if(window._notifInterval){ clearInterval(window._notifInterval); }
-  
+  stopNotifEngine();
   // Checar inmediatamente al cargar
   checkPendingNotifs();
-  
-  // Checar cada 15 segundos (máxima precisión para no perder ventanas)
+  // Checar cada 15 segundos para máxima precisión
   window._notifInterval = setInterval(checkPendingNotifs, 15000);
-  
-  console.log('[NotifEngine] Motor de notificaciones iniciado — chequeando cada 15s');
-  addNotifLog('Motor de notificaciones iniciado', true);
+  addNotifLog('Motor de notificaciones iniciado — cheques cada 15s', 'ok');
 }
 
-// ─────────────────────────────────────────────────────────────────
-// NUEVA LÓGICA: Agrupación de bloques consecutivos por mismo curso
-// Si un curso tiene 2 bloques seguidos el mismo día → 1 solo correo
-// ─────────────────────────────────────────────────────────────────
-function getGroupedBookingsForDay(ds) {
-  // Use weekend blocks on Sat/Sun
-  const dayOfWeek = new Date(ds).getDay();
-  const isWE = dayOfWeek===0||dayOfWeek===6;
-  const items = [];
-  ['basica','media'].forEach(lv => {
-    const blocks = isWE
-      ? (lv==='basica'?(cfg.blocksWEBasica||cfg.blocksBasica):(cfg.blocksWEMedia||cfg.blocksMedia))
-      : getBlocks(lv);
-    blocks.forEach((bl, bi) => {
-      if(bl.isBreak) return;
-      const key = slotKey(ds, lv==='basica'?'b':'m', bi);
-      const bk = data.bookings[key];
-      if(!bk) return;
-      items.push({ key, bk, bl, bi, lv });
-    });
-  });
-  // Ordenar por hora de inicio
-  items.sort((a,b) => a.bl.start.localeCompare(b.bl.start));
-  
-  // Agrupar: mismo curso + mismo nivel + bloques contiguos
-  const groups = [];
-  items.forEach(item => {
-    // Buscar grupo existente que podamos extender
-    const last = groups[groups.length-1];
-    if(last && last.course === item.bk.course && last.level === item.bk.level) {
-      // ¿Son bloques contiguos? (el fin del último = inicio del actual, o hay solo recreo entre medio)
-      const lastEnd   = last.endTime;
-      const thisStart = item.bl.start;
-      // Considerar contiguos si la diferencia es <= 15 min (puede haber un recreo corto)
-      const diffMin   = timeDiffMin(lastEnd, thisStart);
-      if(diffMin <= 16) {
-        last.blocks.push(item);
-        last.endTime = item.bl.end;
-        last.endLabel = item.bl.label;
-        return;
-      }
-    }
-    groups.push({
-      course:    item.bk.course,
-      level:     item.bk.level,
-      teacher:   item.bk.teacher,
-      ds,
-      blocks:    [item],
-      startTime: item.bl.start,
-      endTime:   item.bl.end,
-      startLabel:item.bl.label,
-      endLabel:  item.bl.label,
-      primaryKey: item.key,  // La clave del primer bloque (para trackear notificación)
-    });
-  });
-  return groups;
-}
-
-function timeDiffMin(t1, t2) {
-  // t2 - t1 en minutos
-  const [h1,m1] = t1.split(':').map(Number);
-  const [h2,m2] = t2.split(':').map(Number);
-  return (h2*60+m2) - (h1*60+m1);
-}
-
+// ─────────────────────────────────────────────
+// FUNCIÓN PRINCIPAL: chequea TODOS los bookings
+// Incluye tanto semana como fin de semana
+// ─────────────────────────────────────────────
 function checkPendingNotifs(){
   if(!cfg || !cfg.email) return;
   
   const now = new Date();
-  const todayStr = dStr(now);
-  const tomorrowStr = dStr(new Date(now.getTime() + 86400000));
-  
-  const daysToCheck = [todayStr, tomorrowStr];
-  
   let changed = false;
   
-  // Avisos: siempre 1 min antes (abrir sala) + el adicional configurado
-  const avisos = [];
-  avisos.push({ mins: 1, suffix: '__1min' });
-  if(cfg.minutes && cfg.minutes > 1) {
-    avisos.push({ mins: cfg.minutes, suffix: `__${cfg.minutes}min` });
-  }
-  
-  daysToCheck.forEach(ds => {
-    const groups = getGroupedBookingsForDay(ds);
+  // Buscar en los próximos 2 días (hoy y mañana) para tener margen
+  for(let dayOffset = 0; dayOffset <= 1; dayOffset++) {
+    const d = new Date(now);
+    d.setDate(now.getDate() + dayOffset);
+    d.setHours(0,0,0,0);
+    const ds = dStr(d);
+    const dayOfWeek = d.getDay();
+    const isWEDay = dayOfWeek === 0 || dayOfWeek === 6;
     
-    groups.forEach(group => {
-      const [yr, mo, dy] = ds.split('-').map(Number);
-      const [h, m] = group.startTime.split(':').map(Number);
-      const classTime = new Date(yr, mo-1, dy, h, m, 0, 0);
+    // Obtener todos los bookings para este día
+    const bookingsForDay = getAllBookingsForDay(ds, isWEDay);
+    
+    bookingsForDay.forEach(item => {
+      // Calcular tiempo exacto de inicio de la clase
+      const [yr, mo, dy2] = ds.split('-').map(Number);
+      const [h, m] = item.bl.start.split(':').map(Number);
+      const classStart = new Date(yr, mo-1, dy2, h, m, 0, 0);
+      
+      // Definir qué avisos enviar
+      const avisos = [{ mins: 1, suffix: '__1min' }];
+      if(cfg.minutes && cfg.minutes > 1) {
+        avisos.push({ mins: cfg.minutes, suffix: `__${cfg.minutes}min` });
+      }
       
       avisos.forEach(({ mins, suffix }) => {
-        const sendAt = new Date(classTime.getTime() - mins * 60000);
+        const notifKey = item.key + suffix;
         
-        // Ventana extendida: desde sendAt hasta la hora de inicio de la clase
-        // Esto garantiza que si la ventana de 1 minuto se pierde, igual se envía
-        // mientras la clase no haya comenzado
-        const windowEnd = classTime; // hasta que empiece la clase
+        // Si ya se notificó, saltar
+        if(data.notified[notifKey]) return;
         
-        const notifKey = group.primaryKey + suffix;
+        const sendAt  = new Date(classStart.getTime() - mins * 60000);
+        const missAt  = classStart; // Si pasa de la hora de inicio, se perdió
         
-        if(data.notified[notifKey]) return; // Ya enviado
-        
-        if(now >= sendAt && now <= windowEnd) {
+        if(now >= sendAt && now < missAt) {
+          // ¡Ventana de notificación! Enviar ahora
           data.notified[notifKey] = Date.now();
           changed = true;
-          fireGroupNotif(group, mins);
-          addNotifLog(`🔔 Aviso disparado (${mins}min antes): ${group.course} @ ${group.startTime}`, true);
-        }
-        
-        // Marcar como perdido solo si ya pasó el inicio de la clase
-        if(now > windowEnd && !data.notified[notifKey]) {
+          fireNotif(item, mins, ds);
+          addNotifLog(`🔔 Aviso ${mins}min: ${item.bk.course} @ ${toAmPm(item.bl.start)}`, 'ok');
+        } else if(now >= missAt && !data.notified[notifKey]) {
+          // Se perdió la ventana — marcar como perdido
           data.notified[notifKey] = 'missed_' + Date.now();
           changed = true;
-          addNotifLog(`⚠️ Aviso perdido: ${group.course} @ ${group.startTime} (la clase ya comenzó)`, false);
+          addNotifLog(`⚠️ Aviso perdido: ${item.bk.course} @ ${toAmPm(item.bl.start)} (ya inició)`, 'warn');
         }
       });
     });
-  });
+  }
   
   if(changed) saveData();
 }
 
-// ── SIMULACRO: dispara un aviso de prueba para una hora específica ──
-function runSimulacro(){
-  if(!cfg || !cfg.email){ showToast('Configura tu correo primero'); return; }
-  const dayEl  = document.getElementById('sim_day');
-  const timeEl = document.getElementById('sim_time');
-  const minsEl = document.getElementById('sim_mins');
-  if(!dayEl || !timeEl){ showToast('Selecciona día y hora'); return; }
-  
-  const simTime = timeEl.value;
-  if(!simTime){ showToast('Ingresa la hora del simulacro'); return; }
-  const simMins = parseInt(minsEl.value) || 1;
-  
-  // Construir grupo ficticio
-  const simGroup = {
-    course:     '🧪 SIMULACRO DE PRUEBA',
-    level:      'basica',
-    teacher:    'Sistema',
-    ds:         dayEl.value || dStr(new Date()),
-    blocks:     [{ key:'sim', bk:{}, bl:{start:simTime} }],
-    startTime:  simTime,
-    endTime:    simTime,
-    startLabel: 'Simulacro',
-    endLabel:   'Simulacro',
-    primaryKey: 'sim_' + Date.now(),
-  };
-  
-  showToast(`🧪 Enviando simulacro de ${simMins} min para las ${toAmPm(simTime)}…`, 3000);
-  addNotifLog(`🧪 Simulacro manual: ${simTime} (aviso ${simMins}min)`, true);
-  fireGroupNotif(simGroup, simMins);
+// Obtiene todos los bookings para un día específico (semana o fin de semana)
+function getAllBookingsForDay(ds, isWEDay) {
+  const items = [];
+  ['basica','media'].forEach(lv => {
+    const blocks = isWEDay ? getWEBlocks(lv) : getBlocks(lv);
+    if(!blocks) return;
+    blocks.forEach((bl, bi) => {
+      if(bl.isBreak) return;
+      const key = isWEDay
+        ? weSlotKey(ds, lv, bi)
+        : slotKey(ds, lv==='basica'?'b':'m', bi);
+      const bk = data.bookings[key];
+      if(!bk) return;
+      items.push({ key, bk, bl, bi, lv, ds });
+    });
+  });
+  // Ordenar por hora
+  items.sort((a,b) => a.bl.start.localeCompare(b.bl.start));
+  return items;
 }
 
-// ── SIMULACRO PROGRAMADO: agenda un aviso para una fecha/hora exacta ──
-let _simScheduleTimer = null;
-function scheduleSimulacro(){
-  if(!cfg || !cfg.email){ showToast('Configura tu correo primero'); return; }
-  const dateEl = document.getElementById('sim_date');
-  const timeEl = document.getElementById('sim_sched_time');
-  const minsEl = document.getElementById('sim_sched_mins');
-  if(!dateEl || !timeEl){ showToast('Completa todos los campos'); return; }
-  
-  const simDate = dateEl.value;
-  const simTime = timeEl.value;
-  const simMins = parseInt(minsEl.value) || 1;
-  if(!simDate || !simTime){ showToast('Ingresa fecha y hora'); return; }
-  
-  const [yr,mo,dy] = simDate.split('-').map(Number);
-  const [h,m] = simTime.split(':').map(Number);
-  const classTime = new Date(yr, mo-1, dy, h, m, 0, 0);
-  const fireAt    = new Date(classTime.getTime() - simMins * 60000);
-  const msToFire  = fireAt - new Date();
-  
-  if(msToFire < 0){
-    showToast('⚠️ La hora ya pasó. Elige una hora futura.', 3000);
-    return;
-  }
-  
-  if(_simScheduleTimer) clearTimeout(_simScheduleTimer);
-  const label = document.getElementById('simSchedStatus');
-  if(label){ label.textContent = `⏳ Programado: aviso a las ${toAmPm(fireAt.toTimeString().slice(0,5))} (en ${Math.ceil(msToFire/60000)} min)`; label.style.color='#059669'; }
-  
-  _simScheduleTimer = setTimeout(()=>{
-    const simGroup = {
-      course: '🧪 SIMULACRO PROGRAMADO',
-      level: 'basica', teacher: 'Sistema',
-      ds: simDate,
-      blocks: [{}],
-      startTime: simTime, endTime: simTime,
-      startLabel:'Simulacro', endLabel:'Simulacro',
-      primaryKey: 'simsched_' + Date.now(),
-    };
-    addNotifLog(`🧪 Simulacro programado disparado: ${simTime}`, true);
-    fireGroupNotif(simGroup, simMins);
-    showToast('🧪 ¡Simulacro enviado!', 4000);
-    if(label){ label.textContent = '✅ Simulacro enviado'; label.style.color='#1a56db'; }
-  }, msToFire);
-  
-  showToast(`⏳ Simulacro programado en ${Math.ceil(msToFire/60000)} min`, 3000);
-}
-
-function fireGroupNotif(group, minsAntes) {
-  const lv      = group.level === 'basica' ? 'Educación Básica' : 'Educación Media';
-  const nBloques = group.blocks.length;
-  const es1min  = minsAntes === 1;
-  
-  // Construir rango horario
-  let horario;
-  if(nBloques > 1) {
-    horario = `${toAmPm(group.startTime)} – ${toAmPm(group.endTime)} (${nBloques} bloques)`;
-  } else {
-    horario = `${toAmPm(group.startTime)} – ${toAmPm(group.endTime)}`;
-  }
-  
-  // Texto especial si son múltiples bloques del mismo curso
-  const bloquesInfo = nBloques > 1
-    ? `\n📌 Nota: Este curso usará ${nBloques} bloques continuos (${group.startLabel} al ${group.endLabel}).`
-    : '';
+// Dispara la notificación (browser + email via EmailJS)
+function fireNotif(item, minsAntes, ds) {
+  const lv       = item.lv === 'basica' ? 'Educación Básica' : 'Educación Media';
+  const es1min   = minsAntes === 1;
+  const horario  = `${toAmPm(item.bl.start)} – ${toAmPm(item.bl.end)}`;
   
   const asunto = es1min
-    ? `🚨 ¡1 minuto! Abre el Taller — ${group.course}${nBloques>1?' ('+nBloques+' bloques)':''}`
-    : `⏰ ${minsAntes} min para el Taller — ${group.course}${nBloques>1?' ('+nBloques+' bloques)':''}`;
+    ? `🚨 ¡1 minuto! Abre el Taller — ${item.bk.course}`
+    : `⏰ ${minsAntes} min — Taller de Computación: ${item.bk.course}`;
   
   const mensaje = es1min
-    ? `⚠️ ¡Es hora de ABRIR el Taller de Computación!\n\nEl curso ${group.course} comienza en 1 MINUTO.\n\nEstablecimiento: ${cfg.schoolName}\nNivel: ${lv}\nHorario: ${horario}\nProfesor: ${group.teacher||'—'}\nFecha: ${group.ds}${bloquesInfo}\n\n👉 Ve a abrir el laboratorio AHORA.`
-    : `Recordatorio anticipado — faltan ${minsAntes} minutos.\n\nCurso: ${group.course}\nEstablecimiento: ${cfg.schoolName}\nNivel: ${lv}\nHorario: ${horario}\nProfesor: ${group.teacher||'—'}\nFecha: ${group.ds}${bloquesInfo}\n\n🕐 Prepara todo con anticipación.`;
-  
+    ? `⚠️ ¡Es hora de ABRIR el Taller!\n\nCurso: ${item.bk.course}\nEstablecimiento: ${cfg.schoolName}\nNivel: ${lv}\nHorario: ${horario}\nProfesor: ${item.bk.teacher||'—'}\nFecha: ${ds}\n\n👉 Ve a abrir el laboratorio AHORA.`
+    : `Recordatorio anticipado — faltan ${minsAntes} minutos.\n\nCurso: ${item.bk.course}\nEstablecimiento: ${cfg.schoolName}\nNivel: ${lv}\nHorario: ${horario}\nProfesor: ${item.bk.teacher||'—'}\nFecha: ${ds}\n\n🕐 Prepara todo con anticipación.`;
+
   // Notificación del navegador
   if('Notification' in window && Notification.permission === 'granted'){
-    try{
-      const body = `${lv} | ${horario}${nBloques>1?' | '+nBloques+' bloques':''}${group.teacher?' | '+group.teacher:''}`;
-      new Notification(asunto, { body, icon: '🖥️' });
-    }catch(e){ console.warn('[Notif] Error browser notification:', e); }
+    try {
+      new Notification(asunto, {
+        body: `${lv} · ${horario}${item.bk.teacher?' · '+item.bk.teacher:''}`,
+        icon: '🖥️'
+      });
+    } catch(e) { console.warn('[Browser Notif]', e); }
   }
-  
+
   // Email via EmailJS
-  if(!ejsReady){
-    // Reintentar en 3 segundos si EmailJS no está listo
-    addNotifLog(`⏳ EmailJS no listo, reintentando en 3s: ${group.course}`, false);
-    setTimeout(()=> {
-      if(ejsReady) sendEmailForGroup(group, asunto, mensaje);
-      else addNotifLog(`❌ EmailJS sigue sin estar listo para: ${group.course}`, false);
-    }, 3000);
-    return;
-  }
+  sendEmail(item, asunto, mensaje);
   
-  sendEmailForGroup(group, asunto, mensaje);
+  // También notificar al GAS para que lleve su propio registro
+  syncToGAS();
 }
 
-function sendEmailForGroup(group, asunto, mensaje) {
-  if(!cfg || !cfg.email){ addNotifLog('❌ Sin correo configurado', false); return; }
+function sendEmail(item, asunto, mensaje, retryCount = 0) {
+  if(!cfg || !cfg.email) {
+    addNotifLog('❌ Sin correo configurado', 'err');
+    return;
+  }
   
   const params = {
     curso:     asunto,
-    profesor:  group.teacher || cfg.schoolName,
-    fecha:     `${group.ds} | ${toAmPm(group.startTime)}–${toAmPm(group.endTime)}`,
+    profesor:  item.bk.teacher || cfg.schoolName,
+    fecha:     `${item.ds} | ${toAmPm(item.bl.start)}–${toAmPm(item.bl.end)}`,
     mensaje,
     name:      cfg.schoolName,
     to_email:  cfg.email,
     reply_to:  cfg.email
   };
   
-  console.log('[Email] Enviando a:', cfg.email, '| Asunto:', asunto);
-  
-  emailjs.send(EJS.serviceId, EJS.templateId, params)
-    .then(() => {
-      console.log('[Email] ✅ Enviado:', asunto);
-      addNotifLog(`✅ Email enviado: ${group.course} → ${cfg.email}`, true);
-    })
-    .catch(e => {
-      console.error('[Email] ❌ Error:', e);
-      addNotifLog(`❌ Error al enviar: ${group.course} — ${e.status||e.text||JSON.stringify(e)}`, false);
-      // Reintentar 1 vez después de 5 segundos
-      setTimeout(() => {
-        emailjs.send(EJS.serviceId, EJS.templateId, params)
-          .then(() => addNotifLog(`✅ Reintento OK: ${group.course}`, true))
-          .catch(e2 => addNotifLog(`❌ Reintento fallido: ${e2.status||e2.text||'?'}`, false));
-      }, 5000);
-    });
-}
-
-function testEmail(){
-  if(!cfg||!cfg.email){ showToast('Configura tu correo primero'); return; }
-  
-  if(!ejsReady){
-    showToast('⚠️ EmailJS aún cargando, espera un momento…', 3000);
-    // Reintentar en 2s
-    setTimeout(()=>{
-      if(ejsReady) testEmail();
-      else showToast('❌ EmailJS no pudo cargar. Revisa la consola.', 4000);
-    }, 2000);
+  if(!ejsReady) {
+    if(retryCount < 5) {
+      addNotifLog(`⏳ EmailJS no listo, reintentando en 3s (intento ${retryCount+1})`, 'warn');
+      setTimeout(() => sendEmail(item, asunto, mensaje, retryCount+1), 3000);
+    } else {
+      addNotifLog('❌ EmailJS no está disponible después de varios intentos', 'err');
+    }
     return;
   }
   
-  showToast('📧 Enviando correo de prueba…', 2000);
-  addNotifLog(`📤 Enviando prueba a ${cfg.email}`, true);
-  
-  const params = {
-    curso:    '✅ PRUEBA — Sistema de notificaciones OK',
-    profesor:  cfg.schoolName,
-    fecha:     new Date().toLocaleString('es-CL'),
-    mensaje:   `✅ Correo de prueba desde Taller de Computación.\n\nEstablecimiento: ${cfg.schoolName}\nCorreo configurado: ${cfg.email}\nAviso anticipado: ${cfg.minutes > 0 ? cfg.minutes + ' minutos' : 'Solo 1 min'}\n\nSi recibes este correo, el sistema funciona correctamente.\n\n🕐 Próxima verificación: ${new Date(Date.now()+30000).toLocaleTimeString('es-CL')}`,
-    name:      cfg.schoolName,
-    to_email:  cfg.email,
-    reply_to:  cfg.email
-  };
-  
   emailjs.send(EJS.serviceId, EJS.templateId, params)
     .then(() => {
-      showToast('✅ ¡Correo de prueba enviado! Revisa tu bandeja.', 5000);
-      addNotifLog(`✅ Prueba enviada a ${cfg.email}`, true);
+      addNotifLog(`✅ Email enviado: ${item.bk.course} → ${cfg.email}`, 'ok');
     })
     .catch(e => {
       const errMsg = e.status ? `${e.status}: ${e.text}` : JSON.stringify(e);
-      showToast(`❌ Error al enviar: ${errMsg}`, 6000);
-      addNotifLog(`❌ Error en prueba: ${errMsg}`, false);
-      console.error('[Email test] Error:', e);
+      addNotifLog(`❌ Error email: ${errMsg}`, 'err');
+      // Reintentar 1 vez
+      if(retryCount < 2) {
+        setTimeout(() => sendEmail(item, asunto, mensaje, retryCount+1), 5000);
+      }
     });
 }
 
+// ── TEST DE CORREO ──
+function testEmail(){
+  if(!cfg||!cfg.email){ showToast('Configura tu correo primero'); return; }
+  if(!ejsReady){
+    showToast('⚠️ EmailJS cargando, espera…', 3000);
+    setTimeout(()=>{ if(ejsReady) testEmail(); else showToast('❌ EmailJS no pudo cargar. Revisa la consola.', 4000); }, 2000);
+    return;
+  }
+  showToast('📧 Enviando correo de prueba…', 2000);
+  const params = {
+    curso:     '✅ PRUEBA — Sistema de notificaciones Taller de Computación',
+    profesor:   cfg.schoolName,
+    fecha:      new Date().toLocaleString('es-CL'),
+    mensaje:    `✅ Correo de prueba desde Taller de Computación.\n\nEstablecimiento: ${cfg.schoolName}\nCorreo configurado: ${cfg.email}\nAviso anticipado: ${cfg.minutes > 0 ? cfg.minutes + ' minutos' : 'Solo 1 min'}\n\nSi recibes este correo, el sistema funciona correctamente.\n\n🖥️ Sistema de Gestión de Laboratorio`,
+    name:       cfg.schoolName,
+    to_email:   cfg.email,
+    reply_to:   cfg.email
+  };
+  emailjs.send(EJS.serviceId, EJS.templateId, params)
+    .then(() => {
+      showToast('✅ ¡Correo enviado! Revisa tu bandeja.', 5000);
+      addNotifLog(`✅ Prueba enviada a ${cfg.email}`, 'ok');
+      renderNotifLog();
+    })
+    .catch(e => {
+      const errMsg = e.status ? `${e.status}: ${e.text}` : JSON.stringify(e);
+      showToast(`❌ Error: ${errMsg}`, 6000);
+      addNotifLog(`❌ Error en prueba: ${errMsg}`, 'err');
+      renderNotifLog();
+    });
+}
+
+// ── SIMULACRO ──
+function runSimulacro(){
+  if(!cfg||!cfg.email){ showToast('Configura tu correo primero'); return; }
+  const dayEl  = document.getElementById('sim_day');
+  const timeEl = document.getElementById('sim_time');
+  const minsEl = document.getElementById('sim_mins');
+  if(!dayEl||!timeEl){ showToast('Selecciona día y hora'); return; }
+  const simTime = timeEl.value;
+  if(!simTime){ showToast('Ingresa la hora'); return; }
+  const simMins = parseInt(minsEl.value) || 1;
+  const fakeItem = {
+    key: 'sim_' + Date.now(),
+    bk: { course: '🧪 SIMULACRO DE PRUEBA', teacher: 'Sistema', level: 'basica' },
+    bl: { start: simTime, end: simTime, label: 'Simulacro' },
+    lv: 'basica',
+    ds: dayEl.value || dStr(new Date())
+  };
+  showToast(`🧪 Enviando simulacro (${simMins}min)…`, 3000);
+  addNotifLog(`🧪 Simulacro: ${simTime} — aviso ${simMins}min`, 'ok');
+  fireNotif(fakeItem, simMins, fakeItem.ds);
+}
+
 // ══════════════════════════════════════════
-// VISTA SEMANA COMPLETA (tipo PDF/resumen)
+// VISTA SEMANA COMPLETA
 // ══════════════════════════════════════════
 function renderSemanaView(dates, datesWE){
   const s=document.getElementById('semanaView'); if(!s) return;
@@ -2062,18 +1917,7 @@ function renderSemanaView(dates, datesWE){
     const ds=dStr(d);
     const dayOfWeek=d.getDay();
     const isWEDay=dayOfWeek===0||dayOfWeek===6;
-    const clases=[];
-    ['basica','media'].forEach(lv=>{
-      const blocks=isWEDay?getWEBlocks(lv):getBlocks(lv);
-      blocks.forEach((bl,bi)=>{
-        if(bl.isBreak) return;
-        const key=isWEDay?weSlotKey(ds,lv,bi):slotKey(ds,lv==='basica'?'b':'m',bi);
-        const bk=data.bookings[key];
-        if(!bk) return;
-        clases.push({bl,bi,bk,tk:data.tickets[key],key,lv,ds,isWEDay});
-      });
-    });
-    clases.sort((a,b)=>a.bl.start.localeCompare(b.bl.start));
+    const clases=getAllBookingsForDay(ds, isWEDay).map(item=>({...item, tk: data.tickets[item.key]}));
     return {d,ds,clases};
   });
   const total=byDay.reduce((s,dy)=>s+dy.clases.length,0);
@@ -2089,22 +1933,10 @@ function renderSemanaView(dates, datesWE){
         <button onclick="changeWeek(1)">Siguiente →</button>
       </div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px">
-        <div style="background:#eff6ff;border-radius:8px;padding:10px;text-align:center">
-          <div style="font-size:22px;font-weight:800;color:#1a56db">${total}</div>
-          <div style="font-size:11px;color:#3b82f6">Total clases</div>
-        </div>
-        <div style="background:#f0fdf4;border-radius:8px;padding:10px;text-align:center">
-          <div style="font-size:22px;font-weight:800;color:#059669">${asistio}</div>
-          <div style="font-size:11px;color:#10b981">Asistieron</div>
-        </div>
-        <div style="background:#fef2f2;border-radius:8px;padding:10px;text-align:center">
-          <div style="font-size:22px;font-weight:800;color:#dc2626">${noAsis}</div>
-          <div style="font-size:11px;color:#f87171">No asistieron</div>
-        </div>
-        <div style="background:#fefce8;border-radius:8px;padding:10px;text-align:center">
-          <div style="font-size:22px;font-weight:800;color:#d97706">${pend}</div>
-          <div style="font-size:11px;color:#fbbf24">Pendientes</div>
-        </div>
+        <div style="background:#eff6ff;border-radius:8px;padding:10px;text-align:center"><div style="font-size:22px;font-weight:800;color:#1a56db">${total}</div><div style="font-size:11px;color:#3b82f6">Total</div></div>
+        <div style="background:#f0fdf4;border-radius:8px;padding:10px;text-align:center"><div style="font-size:22px;font-weight:800;color:#059669">${asistio}</div><div style="font-size:11px;color:#10b981">Asistieron</div></div>
+        <div style="background:#fef2f2;border-radius:8px;padding:10px;text-align:center"><div style="font-size:22px;font-weight:800;color:#dc2626">${noAsis}</div><div style="font-size:11px;color:#f87171">No asistieron</div></div>
+        <div style="background:#fefce8;border-radius:8px;padding:10px;text-align:center"><div style="font-size:22px;font-weight:800;color:#d97706">${pend}</div><div style="font-size:11px;color:#fbbf24">Pendientes</div></div>
       </div>
     </div>`;
 
@@ -2115,13 +1947,12 @@ function renderSemanaView(dates, datesWE){
       if(!clases.length) return;
       const fd=d.toLocaleDateString('es-CL',{weekday:'long',day:'numeric',month:'long'});
       const esHoy=isToday(d);
-      const dayOfWeek=d.getDay();
-      const isWE=dayOfWeek===0||dayOfWeek===6;
+      const isWE=d.getDay()===0||d.getDay()===6;
       const headerBg=esHoy?'var(--blue)':isWE?'#7c3aed':'#f9fafb';
       const headerTxt=esHoy||isWE?'#fff':'var(--tx2)';
       html+=`<div class="card" style="padding:0;overflow:hidden;margin-bottom:8px">
         <div style="background:${headerBg};padding:10px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--gray-bd)">
-          <span style="font-size:13px;font-weight:700;color:${headerTxt}">${fd.charAt(0).toUpperCase()+fd.slice(1)}${isWE?' <span style="font-size:10px;background:rgba(255,255,255,.2);padding:2px 7px;border-radius:10px;margin-left:6px">FIN DE SEMANA</span>':''}${esHoy?' <span style="font-size:10px;background:rgba(255,255,255,.2);padding:2px 7px;border-radius:10px;margin-left:6px">HOY</span>':''}</span>
+          <span style="font-size:13px;font-weight:700;color:${headerTxt}">${fd.charAt(0).toUpperCase()+fd.slice(1)}${esHoy?' 🟢':''}</span>
           <span style="font-size:11px;font-weight:600;color:${esHoy||isWE?'rgba(255,255,255,.7)':'var(--tx3)'}">${clases.length} clase${clases.length>1?'s':''}</span>
         </div>`;
       clases.forEach((c,ci)=>{
@@ -2129,14 +1960,11 @@ function renderSemanaView(dates, datesWE){
         const stc=tk==='ok'?'#059669':tk==='no'?'#dc2626':'#d97706';
         const stl=tk==='ok'?'✓ Asistió':tk==='no'?'✕ No asistió':'⏳ Pendiente';
         const stBg=tk==='ok'?'#f0fdf4':tk==='no'?'#fef2f2':'#fefce8';
-        html+=`<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:${ci<clases.length-1?'1px solid var(--gray-bd)':'none'};background:#fff;cursor:pointer" onclick="openBook('${c.ds}',${c.bi},'${c.lv}',true)">
+        html+=`<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:${ci<clases.length-1?'1px solid var(--gray-bd)':'none'};background:#fff">
           <div style="width:3px;height:40px;border-radius:2px;background:${c.lv==='basica'?'var(--blue)':'var(--green)'};flex-shrink:0"></div>
           <div style="min-width:60px">
             <div style="font-size:11px;font-weight:700;font-family:'DM Mono',monospace;color:var(--tx2)">${toAmPm(c.bl.start)}</div>
             <div style="font-size:10px;color:var(--tx3)">${toAmPm(c.bl.end)}</div>
-          </div>
-          <div style="min-width:52px">
-            <span style="background:${c.lv==='basica'?'var(--blue-lt)':'var(--green-lt)'};color:${c.lv==='basica'?'var(--blue-tx)':'var(--green-tx)'};padding:2px 7px;border-radius:20px;font-size:10px;font-weight:700">${c.lv==='basica'?'Básica':'Media'}</span>
           </div>
           <div style="flex:1;min-width:0">
             <div style="font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.bk.course)}</div>
@@ -2145,8 +1973,8 @@ function renderSemanaView(dates, datesWE){
           <div style="text-align:right;flex-shrink:0">
             <div style="background:${stBg};color:${stc};padding:3px 8px;border-radius:20px;font-size:11px;font-weight:700">${stl}</div>
             <div style="display:flex;gap:4px;margin-top:4px;justify-content:flex-end">
-              <button class="tbtn tok ${tk==='ok'?'on':''}" onclick="event.stopPropagation();tick('${c.key}','ok')" style="height:18px;font-size:9px;padding:0 6px">✓</button>
-              <button class="tbtn tno ${tk==='no'?'on':''}" onclick="event.stopPropagation();tick('${c.key}','no')" style="height:18px;font-size:9px;padding:0 6px">✕</button>
+              <button class="tbtn tok ${tk==='ok'?'on':''}" onclick="tick('${c.key}','ok')" style="height:18px;font-size:9px;padding:0 6px">✓</button>
+              <button class="tbtn tno ${tk==='no'?'on':''}" onclick="tick('${c.key}','no')" style="height:18px;font-size:9px;padding:0 6px">✕</button>
             </div>
           </div>
         </div>`;
@@ -2156,176 +1984,10 @@ function renderSemanaView(dates, datesWE){
   }
   s.innerHTML=html;
 }
+
 // ══════════════════════════════════════════
-// VISTA FIN DE SEMANA — MEJORADA
+// NOTAS
 // ══════════════════════════════════════════
-function renderFinDeSemana(datesWE){
-  const s = document.getElementById('findeView'); if(!s) return;
-  if(!ui.weLvl) ui.weLvl = 'basica';
-  const fw = datesWE[0], lw = datesWE[1];
-  const wlWE = `Sáb ${fw.getDate()}/${fw.getMonth()+1} — Dom ${lw.getDate()}/${lw.getMonth()+1}/${lw.getFullYear()}`;
-
-  // Contar reservas del fin de semana
-  let totalWE=0, asistWE=0, noWE=0;
-  ['basica','media'].forEach(lv=>{
-    getWEBlocks(lv).forEach((bl,bi)=>{
-      if(bl.isBreak) return;
-      datesWE.forEach(d=>{
-        const k = weSlotKey(dStr(d),lv,bi);
-        const bk = data.bookings[k]; if(!bk) return;
-        totalWE++;
-        if(data.tickets[k]==='ok') asistWE++;
-        else if(data.tickets[k]==='no') noWE++;
-      });
-    });
-  });
-
-  s.innerHTML=`
-  <style>
-    .we-tab-bar{display:flex;gap:6px;margin-bottom:10px;}
-    .we-tab{flex:1;padding:9px 8px;text-align:center;font-size:13px;font-weight:600;border-radius:var(--r);border:1.5px solid #ddd6fe;background:#fff;color:#7c3aed;cursor:pointer;transition:all .15s;}
-    .we-tab.active-b{background:#ede9fe;border-color:#a78bfa;color:#4c1d95;}
-    .we-tab.active-m{background:#d1fae5;border-color:#6ee7b7;color:#064e3b;}
-    .we-tab.active-cfg{background:#fef9c3;border-color:#fde047;color:#854d0e;}
-  </style>
-
-  <!-- Encabezado -->
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-    <div style="flex:1;height:2px;background:linear-gradient(90deg,#7c3aed,transparent)"></div>
-    <div style="font-size:12px;font-weight:700;color:#5b21b6;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:20px;padding:4px 16px;white-space:nowrap">🏖️ Fin de Semana</div>
-    <div style="flex:1;height:2px;background:linear-gradient(90deg,transparent,#7c3aed)"></div>
-  </div>
-
-  <!-- Stats rápidas -->
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:10px">
-    <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:10px;padding:10px;text-align:center">
-      <div style="font-size:20px;font-weight:800;color:#7c3aed">${totalWE}</div>
-      <div style="font-size:10px;color:#a78bfa;margin-top:2px">Total clases</div>
-    </div>
-    <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:10px;text-align:center">
-      <div style="font-size:20px;font-weight:800;color:#059669">${asistWE}</div>
-      <div style="font-size:10px;color:#34d399;margin-top:2px">Asistieron</div>
-    </div>
-    <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:10px;padding:10px;text-align:center">
-      <div style="font-size:20px;font-weight:800;color:#dc2626">${noWE}</div>
-      <div style="font-size:10px;color:#f87171;margin-top:2px">No asistieron</div>
-    </div>
-    <div style="background:#fefce8;border:1px solid #fde047;border-radius:10px;padding:10px;text-align:center">
-      <div style="font-size:20px;font-weight:800;color:#d97706">${totalWE-asistWE-noWE}</div>
-      <div style="font-size:10px;color:#fbbf24;margin-top:2px">Pendientes</div>
-    </div>
-  </div>
-
-  <!-- Pestañas de nivel + config -->
-  <div class="we-tab-bar">
-    <div class="we-tab ${ui.weLvl==='basica'?'active-b':''}" onclick="setWELvl('basica')">📘 Básica</div>
-    <div class="we-tab ${ui.weLvl==='media'?'active-m':''}" onclick="setWELvl('media')">📗 Media</div>
-    <div class="we-tab ${ui.weLvl==='cfg'?'active-cfg':''}" onclick="setWELvl('cfg')">⚙️ Horarios</div>
-  </div>
-
-  ${ui.weLvl==='cfg' ? renderWECfgPanel() : `
-  <!-- Navegación semana + zoom -->
-  <div class="card" style="padding:10px 12px;border-top:3px solid #7c3aed;margin-bottom:8px">
-    <div class="week-nav">
-      <button onclick="changeWeek(-1)">← Anterior</button>
-      <span style="font-size:14px">${wlWE}</span>
-      <button onclick="changeWeek(1)">Siguiente →</button>
-      <div class="zoom-controls">
-        <button class="zoom-btn" data-dir="out" onclick="zoomOut()" title="Reducir">−</button>
-        <span class="zoom-level">${Math.round(ZOOM_SCALES[ui.calZoom-1]*100)}%</span>
-        <button class="zoom-btn" data-dir="in" onclick="zoomIn()" title="Ampliar">+</button>
-      </div>
-    </div>
-    <div class="legend" style="margin:6px 0 4px;gap:12px">
-      <div class="leg"><div class="ldot-sq" style="background:#f5f3ff;border:1.5px solid #c4b5fd"></div>Disponible</div>
-      <div class="leg"><div class="ldot" style="background:#1a56db"></div>Básica</div>
-      <div class="leg"><div class="ldot" style="background:#059669"></div>Media</div>
-      <div class="leg"><div class="ldot-sq" style="background:#ede9fe;border:1.5px solid #c4b5fd"></div>Recreo</div>
-      <div style="margin-left:auto;font-size:10px;color:var(--tx3)">Clic = agendar · Doble clic = eliminar</div>
-    </div>
-    <div class="cal-wrap" id="calWrapWE">
-      <div id="calGridWEWrap" class="cal-wrap-inner">
-        <div class="cal-grid" id="calGridWE" style="grid-template-columns:62px repeat(2,1fr)"></div>
-      </div>
-    </div>
-  </div>
-  <div class="card" id="weekendCard" style="margin-bottom:8px"></div>
-  `}`;
-
-  if(ui.weLvl !== 'cfg'){
-    renderGridWE(datesWE);
-    renderWeekendToday(datesWE);
-    applyZoom();
-  } else {
-    renderWEBlocks('basica');
-    renderWEBlocks('media');
-  }
-}
-
-function setWELvl(lv){
-  ui.weLvl = lv;
-  const datesWE = getWeekendDates(ui.weekOffset);
-  renderFinDeSemana(datesWE);
-}
-
-function renderWECfgPanel(){
-  return `<div class="card" style="border-top:3px solid #7c3aed;padding:18px">
-    <div style="font-size:13px;color:var(--tx3);margin-bottom:14px;line-height:1.6;background:#f5f3ff;border-radius:8px;padding:10px 12px;border:1px solid #ddd6fe">
-      ✏️ <b>Horario exclusivo para Sáb–Dom.</b> Estos bloques son completamente independientes de los horarios de lunes a viernes. Las clases agendadas aquí se guardan por separado.
-    </div>
-    <div class="cfg-title" style="margin-top:0;color:var(--blue-tx)">📘 Educación Básica — Sáb &amp; Dom</div>
-    <div class="blocks-hdr"><span>Nombre</span><span>Inicio</span><span>Fin</span><span></span><span></span></div>
-    <div id="we_bb"></div>
-    <button class="add-btn" onclick="addWEBlock('basica')">+ Agregar bloque</button>
-    <div class="cfg-title" style="color:var(--green-tx);margin-top:18px">📗 Educación Media — Sáb &amp; Dom</div>
-    <div class="blocks-hdr"><span>Nombre</span><span>Inicio</span><span>Fin</span><span></span><span></span></div>
-    <div id="we_bm"></div>
-    <button class="add-btn" onclick="addWEBlock('media')">+ Agregar bloque</button>
-    <div class="btn-row" style="margin-top:18px;justify-content:flex-end">
-      <button class="btn btn-blue" onclick="saveWEBlocks()">Guardar horarios ✓</button>
-    </div>
-  </div>`;
-}
-
-function renderWEBlocks(level){
-  const arr=level==='basica'?(cfg.blocksWEBasica||(cfg.blocksWEBasica=JSON.parse(JSON.stringify(cfg.blocksBasica))))
-                             :(cfg.blocksWEMedia ||(cfg.blocksWEMedia =JSON.parse(JSON.stringify(cfg.blocksMedia))));
-  const cid=level==='basica'?'we_bb':'we_bm';
-  const c=document.getElementById(cid); if(!c) return;
-  const key=level==='basica'?'blocksWEBasica':'blocksWEMedia';
-  c.innerHTML=arr.map((b,i)=>`
-    <div class="block-row ${b.isBreak?'brk-row':''}">
-      <input class="inp-sm" value="${esc(b.label)}" onchange="cfg.${key}[${i}].label=this.value"/>
-      <input class="inp-sm" type="time" value="${b.start}" onchange="cfg.${key}[${i}].start=this.value"/>
-      <input class="inp-sm" type="time" value="${b.end}"   onchange="cfg.${key}[${i}].end=this.value"/>
-      <button class="icon-btn" title="${b.isBreak?'Convertir a clase':'Marcar como recreo'}" onclick="toggleWEBreak('${level}',${i})">${b.isBreak?'🌿':'☕'}</button>
-      <button class="del-btn"  onclick="delWEBlock('${level}',${i})">✕</button>
-    </div>`).join('');
-}
-
-function toggleWEBreak(lv,i){
-  const a=lv==='basica'?cfg.blocksWEBasica:cfg.blocksWEMedia;
-  a[i].isBreak=!a[i].isBreak;
-  renderWEBlocks(lv);
-}
-function addWEBlock(lv){
-  const a=lv==='basica'?cfg.blocksWEBasica:cfg.blocksWEMedia;
-  const last=a[a.length-1];
-  a.push({label:`Bloque ${a.length+1}`,start:last?last.end:'08:00',end:'09:00',isBreak:false});
-  renderWEBlocks(lv);
-}
-function delWEBlock(lv,i){
-  const a=lv==='basica'?cfg.blocksWEBasica:cfg.blocksWEMedia;
-  if(a.length<=1){ showToast('Mínimo una fila'); return; }
-  a.splice(i,1);
-  renderWEBlocks(lv);
-}
-function saveWEBlocks(){
-  saveCfg();
-  showToast('✓ Horario de fin de semana guardado');
-  const datesWE = getWeekendDates(ui.weekOffset);
-  renderFinDeSemana(datesWE);
-}
 let _notesSaveTimer=null;
 function renderNotas(){
   const s=document.getElementById('notasView'); if(!s) return;
@@ -2355,13 +2017,11 @@ function createNota(){
   if(!data.notes) data.notes={};
   data.notes[nid]={title:'',body:'',createdAt:Date.now(),updatedAt:Date.now()};
   saveData(); renderNotas();
-  // Focus the new textarea
   setTimeout(()=>{ const ta=document.querySelector(`#nota_${nid} .nota-body`); if(ta) ta.focus(); },100);
 }
 function scheduleNotaSave(nid,field,val){
   if(!data.notes[nid]) return;
   data.notes[nid][field]=val; data.notes[nid].updatedAt=Date.now();
-  // Update meta display
   const meta=document.querySelector(`#nota_${nid} .nota-meta`);
   if(meta) meta.textContent='Guardando…';
   clearTimeout(_notesSaveTimer);
@@ -2406,17 +2066,8 @@ function exportPDF(){
 
   const byDay=allDates.map(d=>{
     const ds=dStr(d);
-    const clases=[];
-    ['basica','media'].forEach(lv=>{
-      getBlocks(lv).forEach((bl,bi)=>{
-        if(bl.isBreak) return;
-        const key=slotKey(ds,lv==='basica'?'b':'m',bi);
-        const bk=data.bookings[key];
-        if(!bk) return;
-        clases.push({bl,bi,bk,tk:data.tickets[key],key,lv});
-      });
-    });
-    clases.sort((a,b)=>a.bl.start.localeCompare(b.bl.start));
+    const isWEDay=d.getDay()===0||d.getDay()===6;
+    const clases=getAllBookingsForDay(ds, isWEDay).map(item=>({...item, tk: data.tickets[item.key]}));
     return {d,ds,clases};
   });
 
@@ -2493,7 +2144,6 @@ function exportPDF(){
   showToast('📄 PDF guardado');
 }
 
-
 // ══════════════════════════════════════════
 // EVENTS
 // ══════════════════════════════════════════
@@ -2502,20 +2152,19 @@ document.getElementById('bCourse').addEventListener('keydown',e=>{ if(e.key==='E
 document.getElementById('lPass').addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
 document.getElementById('rPass2').addEventListener('keydown',e=>{ if(e.key==='Enter') doRegister(); });
 
-// ══════════════════════════════════════════
-// VISIBILIDAD: Checar notificaciones al volver a la pestaña
-// ══════════════════════════════════════════
+// Reanudar motor al volver a la pestaña
 document.addEventListener('visibilitychange', () => {
   if(document.visibilityState === 'visible' && cfg) {
-    console.log('[NotifEngine] Pestaña activa — chequeo inmediato');
-    // Chequear inmediatamente y reiniciar el intervalo para mantener precisión
+    addNotifLog('Pestaña activa — chequeo inmediato', 'ok');
     checkPendingNotifs();
-    if(window._notifInterval){
-      clearInterval(window._notifInterval);
-      window._notifInterval = setInterval(checkPendingNotifs, 15000);
-    }
+    // Reiniciar intervalo para mantener precisión
+    stopNotifEngine();
+    startNotifEngine();
   }
 });
+
+// Sincronizar GAS cada 5 minutos mientras la web esté abierta
+setInterval(() => { if(cfg) syncToGAS(); }, 5 * 60 * 1000);
 </script>
 </body>
 </html>
