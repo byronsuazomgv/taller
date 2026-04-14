@@ -1505,6 +1505,19 @@ function tick(key,val){
   const newVal = data.tickets[key]===val ? null : val;
   data.tickets[key] = newVal;
   window._lastTicketChange = Date.now();
+
+  // Sincronizar mismo curso, mismo día — todos los bloques y niveles del día
+  const thisBk = data.bookings[key];
+  if(thisBk && thisBk.course && thisBk.ds){
+    const ds = thisBk.ds;
+    const isWEDay = (() => { try { const [y,m,d]=ds.split('-').map(Number); const dow=new Date(y,m-1,d).getDay(); return dow===0||dow===6; } catch(e){ return false; } })();
+    getAllBookingsForDay(ds, isWEDay).forEach(item => {
+      if(item.key !== key && item.bk.course === thisBk.course){
+        data.tickets[item.key] = newVal;
+      }
+    });
+  }
+
   saveData();
   renderMain();
   showToast(newVal==='ok'?'✓ Asistió':newVal==='no'?'✕ No asistió':'↩️ Ticket removido', 1800);
