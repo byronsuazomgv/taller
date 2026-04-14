@@ -1,0 +1,2740 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="theme-color" content="#1a56db"/>
+<title>Taller de Computación</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile }
+  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, getDocs }
+  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+const firebaseConfig = {
+  apiKey:            "AIzaSyD4BBgvsoneI3pW4pdOOdePkiAF_RMTryI",
+  authDomain:        "taller-de-computacion-39499.firebaseapp.com",
+  projectId:         "taller-de-computacion-39499",
+  storageBucket:     "taller-de-computacion-39499.firebasestorage.app",
+  messagingSenderId: "804995685628",
+  appId:             "1:804995685628:web:765fb871d4094308de8b79",
+  measurementId:     "G-RYNSLVMED3"
+};
+
+let fbApp, fbAuth, fbDb;
+try {
+  fbApp  = initializeApp(firebaseConfig);
+  fbAuth = getAuth(fbApp);
+  fbDb   = getFirestore(fbApp);
+  window._fbReady = true;
+} catch(e) {
+  window._fbReady = false;
+  console.warn('Firebase no configurado:', e.message);
+}
+
+window._fb = {
+  fns: { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, doc, setDoc, getDoc, onSnapshot, collection, getDocs },
+  auth: fbAuth, db: fbDb
+};
+
+window.saveToCloud = async function(uid) {
+  if (!uid || !fbDb) return;
+  try {
+    const user = window._currentUser;
+    const userEmail = user ? (user.email || '') : '';
+    const bookingsBasica = {};
+    const bookingsMedia  = {};
+    Object.entries(window._appData.bookings || {}).forEach(([k, v]) => {
+      if (v && v.level === 'basica') bookingsBasica[k] = v;
+      else if (v && v.level === 'media') bookingsMedia[k] = v;
+    });
+    const ref = doc(fbDb, 'users', uid, 'data', 'main');
+    await setDoc(ref, {
+      cfg:             window._appCfg   || null,
+      bookings:        window._appData.bookings || {},
+      bookingsBasica,
+      bookingsMedia,
+      tickets:         window._appData.tickets  || {},
+      notified:        window._appData.notified || {},
+      ots:             window._appData.ots      || {},
+      notes:           window._appData.notes    || {},
+      userEmail,
+      userName:        user ? (user.displayName || '') : '',
+      updatedAt:       Date.now()
+    });
+  } catch(e) { console.error('Cloud save:', e); }
+};
+
+window.loadCloudData = async function(uid) {
+  if (!uid || !fbDb) return;
+  try {
+    const ref  = doc(fbDb, 'users', uid, 'data', 'main');
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+      const d = snap.data();
+      if (d.cfg)      { window._appCfg = d.cfg; LSS('cfg', d.cfg); }
+      if (d.bookings) { window._appData.bookings = d.bookings; LSS('bookings', d.bookings); }
+      if (d.tickets)  { window._appData.tickets  = d.tickets;  LSS('tickets',  d.tickets);  }
+      if (d.notified) { window._appData.notified = d.notified; LSS('notified', d.notified); }
+      if (d.notes)    { window._appData.notes    = d.notes;    LSS('notes',    d.notes);    }
+      if (d.ots)      { window._appData.ots      = d.ots;      LSS('ots',      d.ots);      }
+    }
+    if (window._unsubSync) window._unsubSync();
+    window._unsubSync = onSnapshot(ref, (snap2) => {
+      if (!snap2.exists()) return;
+      const d2 = snap2.data();
+      if (d2.updatedAt && d2.updatedAt > (window._lastSave || 0)) {
+        if (d2.cfg)      window._appCfg = d2.cfg;
+        if (d2.bookings) window._appData.bookings = d2.bookings;
+        if (d2.tickets)  window._appData.tickets  = d2.tickets;
+        if (d2.notes)    window._appData.notes    = d2.notes;
+        if (d2.ots)      window._appData.ots      = d2.ots;
+        if (window._appMounted) window._appMounted();
+      }
+    });
+  } catch(e) { console.error('Cloud load:', e); }
+};
+
+if (fbAuth) {
+  onAuthStateChanged(fbAuth, async (user) => {
+    if (user) {
+      window._currentUser = user;
+      window._guestMode   = false;
+      document.getElementById('portalScreen').style.display='none';
+      await window.loadCloudData(user.uid);
+      window.showApp();
+    } else {
+      window._currentUser = null;
+    }
+  });
+}
+</script>
+<style>
+:root{
+  --blue:#1a56db;--blue-dk:#1240a8;--blue-lt:#e8f0fe;--blue-tx:#1e3a8a;
+  --green:#059669;--green-lt:#d1fae5;--green-tx:#065f46;
+  --brk-bg:#bbf7d0;--brk-tx:#166534;--brk-bd:#86efac;
+  --red:#dc2626;--red-lt:#fee2e2;--red-tx:#991b1b;
+  --amber:#d97706;--amber-lt:#fef3c7;--amber-tx:#92400e;
+  --gray:#6b7280;--gray-lt:#f3f4f6;--gray-bd:#e5e7eb;
+  --slot:#f4f6f9;--slot-bd:#dde2ea;--slot-tx:#b0b7c3;
+  --text:#111827;--tx2:#374151;--tx3:#6b7280;
+  --bg:#eef1f7;--card:#fff;
+  --r:12px;--rs:7px;
+  --sh:0 1px 4px rgba(0,0,0,.08);--shm:0 6px 20px rgba(0,0,0,.13);
+  --slot-h:62px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{font-family:'DM Sans',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:15px;}
+button,input,select{font-family:inherit;}
+
+/* ─── AUTH ─── */
+#authScreen{
+  min-height:100vh;display:none;align-items:center;justify-content:center;
+  background:linear-gradient(140deg,#071a52 0%,#1a56db 55%,#1d8cf8 100%);
+  padding:16px;position:relative;overflow:hidden;
+}
+#authScreen::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse at 70% 20%,rgba(255,255,255,.08) 0%,transparent 60%);
+  pointer-events:none;
+}
+.auth-card{
+  background:#fff;border-radius:22px;padding:36px 32px;width:100%;max-width:400px;
+  box-shadow:0 24px 64px rgba(0,0,0,.28);position:relative;z-index:1;
+  animation:authIn .45s cubic-bezier(.34,1.56,.64,1) both;
+}
+@keyframes authIn{from{opacity:0;transform:translateY(28px) scale(.95)}to{opacity:1;transform:none}}
+.auth-logo{text-align:center;margin-bottom:26px;}
+.auth-icon{
+  width:68px;height:68px;background:linear-gradient(135deg,var(--blue),#1d8cf8);
+  border-radius:20px;display:inline-flex;align-items:center;justify-content:center;
+  font-size:34px;margin-bottom:13px;box-shadow:0 8px 28px rgba(26,86,219,.38);
+}
+.auth-logo h1{font-size:21px;font-weight:700;color:var(--text);}
+.auth-logo p{font-size:13px;color:var(--tx3);margin-top:3px;}
+.auth-tabs{display:flex;background:var(--gray-lt);border-radius:9px;padding:3px;margin-bottom:22px;}
+.auth-tab{flex:1;padding:8px;text-align:center;font-size:13px;font-weight:600;border-radius:7px;cursor:pointer;color:var(--tx3);transition:all .2s;}
+.auth-tab.active{background:#fff;color:var(--blue);box-shadow:0 1px 5px rgba(0,0,0,.12);}
+.fr{margin-bottom:13px;}
+.fr label{font-size:12px;font-weight:600;color:var(--tx2);display:block;margin-bottom:5px;}
+.inp{width:100%;padding:10px 13px;font-size:14px;border:1.5px solid var(--gray-bd);border-radius:var(--rs);background:#fff;color:var(--text);transition:border-color .15s;}
+.inp:focus{outline:none;border-color:var(--blue);}
+.btn-auth{
+  width:100%;padding:12px;font-size:15px;font-weight:700;border:none;border-radius:var(--rs);cursor:pointer;
+  background:linear-gradient(135deg,var(--blue),#1d8cf8);color:#fff;
+  box-shadow:0 4px 16px rgba(26,86,219,.35);transition:opacity .15s,transform .1s;
+  margin-bottom:8px;
+}
+.btn-auth:hover{opacity:.9;}
+.btn-auth:active{transform:scale(.98);}
+.btn-auth.ghost{background:linear-gradient(135deg,#4b5563,#6b7280);}
+.auth-err{background:var(--red-lt);border:1px solid #fca5a5;border-radius:var(--rs);padding:10px 14px;font-size:13px;color:var(--red-tx);margin-bottom:14px;display:none;}
+.auth-err.show{display:block;}
+.auth-sep{text-align:center;font-size:12px;color:var(--tx3);margin:12px 0;position:relative;}
+.auth-sep::before{content:'';position:absolute;top:50%;left:0;right:0;height:1px;background:var(--gray-bd);}
+.auth-sep span{background:#fff;padding:0 10px;position:relative;}
+.fb-notice{background:#fffbeb;border:1px solid #fcd34d;border-radius:var(--rs);padding:11px 14px;font-size:12px;color:#92400e;margin-bottom:16px;line-height:1.7;display:none;}
+.fb-notice.show{display:block;}
+.fb-notice code{background:#fef3c7;padding:1px 4px;border-radius:3px;font-size:11px;}
+
+/* ─── APP ─── */
+.app{max-width:1100px;margin:0 auto;padding:10px;}
+.header{
+  background:linear-gradient(135deg,var(--blue-dk),var(--blue));
+  color:#fff;border-radius:var(--r);padding:14px 18px;margin-bottom:12px;
+  display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+  box-shadow:0 4px 18px rgba(26,86,219,.32);
+}
+.header-title{font-size:17px;font-weight:700;}
+.header-sub{font-size:11px;opacity:.72;margin-top:2px;}
+.hdr-btns{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.hdr-btn{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.24);color:#fff;border-radius:var(--rs);padding:7px 12px;font-size:13px;cursor:pointer;transition:background .15s;}
+.hdr-btn:hover{background:rgba(255,255,255,.26);}
+.hdr-btn.danger{background:rgba(220,38,38,.25);border-color:rgba(220,38,38,.5);}
+.hdr-btn.danger:hover{background:rgba(220,38,38,.45);}
+.user-menu{position:relative;}
+.user-chip{display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:30px;padding:5px 12px 5px 5px;cursor:pointer;transition:background .15s;}
+.user-chip:hover{background:rgba(255,255,255,.22);}
+.user-av{width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;}
+.user-nm{font-size:12px;font-weight:600;color:#fff;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.user-dd{display:none;position:absolute;right:0;top:calc(100%+8px);background:#fff;border:1px solid var(--gray-bd);border-radius:var(--rs);box-shadow:var(--shm);min-width:200px;z-index:300;overflow:hidden;}
+.user-dd.open{display:block;animation:dropIn .15s ease both;}
+@keyframes dropIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.ud-item{padding:10px 16px;font-size:13px;color:var(--tx2);cursor:pointer;display:flex;align-items:center;gap:9px;transition:background .1s;}
+.ud-item:hover{background:var(--gray-lt);}
+.ud-item.danger{color:var(--red);}
+.ud-sep{height:1px;background:var(--gray-bd);margin:3px 0;}
+.ud-info{padding:10px 16px;font-size:12px;color:var(--tx3);border-bottom:1px solid var(--gray-bd);}
+.sync-badge{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:20px;font-size:11px;font-weight:600;cursor:default;}
+.s-ok{background:rgba(209,250,229,.9);color:#065f46;}
+.s-off{background:rgba(254,226,226,.9);color:#991b1b;}
+.s-ing{background:rgba(254,243,199,.9);color:#92400e;}
+
+.tab-bar{display:flex;gap:8px;margin-bottom:12px;}
+.tab{flex:1;padding:10px 6px;text-align:center;font-size:14px;font-weight:500;border-radius:var(--r);border:1.5px solid var(--gray-bd);background:var(--card);color:var(--tx3);cursor:pointer;transition:all .15s;}
+.tab.ab{background:var(--blue-lt);border-color:#93c5fd;color:var(--blue-tx);}
+.tab.am{background:var(--green-lt);border-color:#6ee7b7;color:var(--green-tx);}
+.tab.at{background:var(--gray-lt);border-color:#d1d5db;color:var(--tx2);}
+.card{background:var(--card);border-radius:var(--r);border:1px solid var(--gray-bd);padding:14px 16px;margin-bottom:12px;box-shadow:var(--sh);}
+.card-title{font-size:11px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;}
+.week-nav{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.week-nav button{background:none;border:1px solid var(--gray-bd);border-radius:var(--rs);padding:7px 14px;font-size:13px;color:var(--tx2);cursor:pointer;}
+.week-nav button:hover{background:var(--gray-lt);}
+.week-nav span{flex:1;text-align:center;font-size:15px;font-weight:600;}
+.cal-wrap{overflow-x:auto;}
+.cal-grid{display:grid;gap:3px;}
+.cal-head{font-size:12px;font-weight:600;color:var(--tx3);text-align:center;padding:6px 2px;}
+.cal-head.today{color:var(--blue);}
+.time-lbl{font-size:9px;color:var(--tx3);text-align:right;padding-right:5px;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;line-height:1.5;font-family:'DM Mono',monospace;}
+.time-end{font-size:8px;color:var(--slot-tx);}
+.slot{min-height:var(--slot-h);border:1.5px solid var(--slot-bd);border-radius:var(--rs);display:flex;flex-direction:column;padding:4px 5px;background:var(--slot);transition:border-color .1s,background .1s,min-height .15s;}
+.span-badge{font-size:9px;font-weight:700;background:rgba(0,0,0,.08);color:inherit;border-radius:4px;padding:1px 5px;margin-bottom:3px;align-self:flex-start;}
+.slot.can-click{cursor:pointer;}
+.slot.can-click:hover{border-color:#93c5fd;background:#f0f7ff;}
+.slot.sb{background:var(--blue-lt);border-color:#93c5fd;}
+.slot.sm{background:var(--green-lt);border-color:#6ee7b7;}
+.slot.is-past{opacity:.4;background:#ebebeb;border-color:#d8d8d8;}
+.slot.brk{background:var(--brk-bg);border-color:var(--brk-bd);justify-content:center;cursor:default;min-height:34px;}
+.slot-plus{font-size:17px;color:var(--slot-tx);flex:1;display:flex;align-items:center;justify-content:center;}
+.slot-course{font-size:11px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.slot-sub{font-size:10px;color:var(--tx3);margin-top:1px;}
+.brk-lbl{font-size:10px;font-weight:700;color:var(--brk-tx);text-align:center;}
+.trow{display:flex;gap:3px;margin-top:4px;}
+.tbtn{flex:1;height:20px;border:none;border-radius:3px;cursor:pointer;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;transition:all .1s;}
+.tok{background:#d1fae5;color:#065f46;}.tok.on{background:#059669;color:#fff;}
+.tno{background:#fee2e2;color:#991b1b;}.tno.on{background:#dc2626;color:#fff;}
+.dup-btn{background:none;border:none;cursor:pointer;color:#93c5fd;font-size:12px;padding:1px 3px;line-height:1;margin-left:auto;transition:color .1s;}
+.dup-btn:hover{color:var(--blue);}
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px;}
+.leg{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--tx3);}
+.ldot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.ldot-sq{width:10px;height:10px;border-radius:2px;flex-shrink:0;}
+.status-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--gray-bd);}
+.status-row:last-child{border-bottom:none;}
+.badge{display:inline-block;font-size:10px;padding:2px 8px;border-radius:20px;font-weight:700;white-space:nowrap;}
+.bb{background:var(--blue-lt);color:var(--blue-tx);}.bm{background:var(--green-lt);color:var(--green-tx);}
+
+/* SETUP */
+.setup-wrap{max-width:520px;margin:2rem auto;}
+.setup-wrap-wide{max-width:700px;margin:2rem auto;}
+.steps{display:flex;margin-bottom:1.5rem;}
+.stp{flex:1;text-align:center;padding:9px 4px;font-size:12px;color:var(--tx3);border-bottom:2px solid var(--gray-bd);}
+.stp.act{color:var(--blue);border-bottom-color:var(--blue);font-weight:700;}
+.stp.done{color:var(--green);border-bottom-color:var(--green);}
+.inp-sm{padding:6px 8px;font-size:13px;border:1.5px solid var(--gray-bd);border-radius:var(--rs);background:#fff;color:var(--text);width:100%;}
+.inp-sm:focus{outline:none;border-color:var(--blue);}
+.btn{padding:10px 22px;font-size:14px;font-weight:700;border:none;border-radius:var(--rs);cursor:pointer;transition:opacity .1s;}
+.btn:hover{opacity:.85;}
+.btn-blue{background:var(--blue);color:#fff;}
+.btn-green{background:var(--green);color:#fff;}
+.btn-ghost{background:none;border:1.5px solid var(--gray-bd);color:var(--tx2);padding:10px 22px;font-size:14px;font-weight:500;border-radius:var(--rs);cursor:pointer;}
+.btn-ghost:hover{background:var(--gray-lt);}
+.btn-row{display:flex;gap:8px;margin-top:14px;}
+.block-row{display:grid;grid-template-columns:1fr 82px 82px auto auto;gap:5px;align-items:center;margin-bottom:6px;}
+.block-row.brk-row{background:var(--brk-bg);border-radius:var(--rs);padding:4px 6px;}
+.add-btn{display:flex;align-items:center;gap:6px;padding:8px 12px;border:1.5px dashed #d1d5db;border-radius:var(--rs);cursor:pointer;background:none;font-size:13px;color:var(--tx3);margin-top:4px;}
+.add-btn:hover{border-color:var(--blue);color:var(--blue);}
+.icon-btn{background:none;border:1.5px solid #d1d5db;border-radius:var(--rs);cursor:pointer;font-size:12px;padding:4px 7px;line-height:1;}
+.del-btn{background:none;border:none;cursor:pointer;color:#d1d5db;font-size:16px;padding:2px 4px;line-height:1;}
+.del-btn:hover{color:var(--red);}
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;align-items:center;justify-content:center;padding:16px;}
+.modal-bg.open{display:flex;}
+.modal{background:#fff;border-radius:var(--r);padding:22px;width:100%;max-width:360px;max-height:90vh;overflow-y:auto;box-shadow:0 12px 48px rgba(0,0,0,.25);}
+.modal h3{font-size:16px;font-weight:700;margin-bottom:14px;}
+.cfg-title{font-size:13px;font-weight:700;color:var(--tx2);margin:16px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--gray-bd);}
+.blocks-hdr{display:grid;grid-template-columns:1fr 82px 82px auto auto;gap:5px;margin-bottom:6px;}
+.blocks-hdr span{font-size:11px;color:var(--tx3);font-weight:600;}
+.now-row{background:linear-gradient(90deg,#f0fdf4,#fff);border-left:3px solid #059669 !important;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1f2937;color:#fff;padding:10px 22px;border-radius:30px;font-size:13px;font-weight:500;z-index:1000;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;}
+.toast.show{opacity:1;}
+.notif-banner{background:var(--amber-lt);border:1px solid #fcd34d;border-radius:var(--rs);padding:10px 14px;font-size:13px;color:var(--amber-tx);margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.notif-banner button{background:var(--amber);color:#fff;border:none;border-radius:var(--rs);padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;}
+
+/* GAS Status Banner */
+.gas-banner{
+  background:linear-gradient(135deg,#f0fdf4,#dcfce7);
+  border:1.5px solid #86efac;border-radius:var(--rs);
+  padding:10px 14px;font-size:12px;color:#166534;
+  margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+}
+.gas-banner.error{background:linear-gradient(135deg,#fef2f2,#fee2e2);border-color:#fca5a5;color:#991b1b;}
+.gas-banner.warn{background:linear-gradient(135deg,#fffbeb,#fef3c7);border-color:#fcd34d;color:#92400e;}
+
+/* Notif log panel */
+.notif-log{background:#f8fafc;border:1px solid var(--gray-bd);border-radius:var(--rs);padding:10px 14px;font-size:12px;color:var(--tx3);max-height:160px;overflow-y:auto;font-family:'DM Mono',monospace;}
+.notif-log .nl-item{padding:3px 0;border-bottom:1px solid #eee;line-height:1.4;}
+.notif-log .nl-ok{color:var(--green-tx);}
+.notif-log .nl-err{color:var(--red-tx);}
+.notif-log .nl-warn{color:var(--amber-tx);}
+
+/* ─── NOTES ─── */
+.tab.an{background:#fef9c3;border-color:#fde047;color:#854d0e;}
+.tab.aot{background:#fdf4ff;border-color:#d8b4fe;color:#6b21a8;}
+.notas-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-bottom:10px;}
+.nota-card2{border:1.5px solid #fde047;border-radius:var(--r);padding:0;overflow:hidden;transition:box-shadow .15s,transform .1s;display:flex;flex-direction:column;}
+.nota-card2:focus-within{box-shadow:0 4px 16px rgba(0,0,0,.12);transform:translateY(-1px);}
+.nota2-toolbar{display:flex;align-items:center;gap:6px;padding:7px 10px 5px;border-bottom:1px solid rgba(0,0,0,.06);}
+.nota2-pin{background:none;border:none;cursor:pointer;font-size:14px;padding:2px 3px;opacity:.35;transition:opacity .15s,transform .1s;}
+.nota2-pin:hover,.nota2-pin.on{opacity:1;}
+.nota2-pin.on{transform:rotate(-30deg);}
+.nota2-colors{display:flex;gap:4px;flex:1;}
+.nota2-color-dot{width:14px;height:14px;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0;transition:transform .1s;flex-shrink:0;}
+.nota2-color-dot:hover,.nota2-color-dot.sel{transform:scale(1.3);border-width:2px;}
+.nota-del{background:none;border:none;cursor:pointer;color:#d1d5db;font-size:14px;padding:2px 4px;transition:color .1s;}
+.nota-del:hover{color:var(--red);}
+.nota-title-inp2{width:100%;padding:9px 12px 4px;border:none;outline:none;font-size:14px;font-weight:700;color:var(--text);background:transparent;font-family:inherit;}
+.nota-title-inp2::placeholder{color:rgba(0,0,0,.25);}
+.nota-body2{width:100%;min-height:120px;padding:4px 12px 8px;border:none;outline:none;font-size:13px;color:var(--tx2);resize:vertical;font-family:inherit;line-height:1.65;background:transparent;flex:1;}
+.nota-body2::placeholder{color:rgba(0,0,0,.25);}
+.nota2-footer{display:flex;align-items:center;justify-content:space-between;padding:5px 12px 7px;border-top:1px solid rgba(0,0,0,.06);}
+.nota2-meta{font-size:10px;color:rgba(0,0,0,.35);}
+.nota2-words{font-size:10px;color:rgba(0,0,0,.3);}
+/* ─── OT ─── */
+.ot-item{background:#fff;border:1.5px solid var(--gray-bd);border-radius:var(--rs);padding:12px 12px 12px 10px;margin-bottom:8px;display:flex;align-items:flex-start;gap:10px;transition:opacity .2s;}
+.ot-item.ot-done{opacity:.55;background:#f9fafb;}
+.ot-check-col{flex-shrink:0;padding-top:2px;}
+.ot-check-wrap{display:inline-flex;cursor:pointer;}
+.ot-check{display:none;}
+.ot-checkmark{width:22px;height:22px;border:2px solid #d1d5db;border-radius:6px;display:flex;align-items:center;justify-content:center;transition:all .15s;background:#fff;}
+.ot-check:checked+.ot-checkmark{background:#059669;border-color:#059669;}
+.ot-check:checked+.ot-checkmark::after{content:'✓';color:#fff;font-size:13px;font-weight:700;}
+.ot-body{flex:1;min-width:0;}
+.ot-code{font-size:13px;font-weight:800;color:#6b21a8;font-family:'DM Mono',monospace;background:#f3e8ff;padding:2px 8px;border-radius:6px;}
+.ot-item.ot-done .ot-code{text-decoration:line-through;color:#9ca3af;background:#f3f4f6;}
+.ot-desc{font-size:13px;color:var(--tx2);margin-top:4px;line-height:1.5;}
+.ot-item.ot-done .ot-desc{color:var(--tx3);}
+.ot-actions{flex-shrink:0;}
+.ot-del-btn{background:none;border:none;cursor:pointer;color:#d1d5db;font-size:14px;padding:2px 4px;transition:color .1s;}
+.ot-del-btn:hover{color:var(--red);}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ─── STATS STRIP ─── */
+.stats-strip{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 8px;padding:0 1px;}
+.stat-pill{display:flex;align-items:center;gap:5px;padding:5px 11px;border-radius:20px;font-size:12px;font-weight:600;cursor:default;}
+.stat-pill span{font-size:15px;font-weight:800;}
+.sp-tot{background:#eff6ff;color:#1e3a8a;}
+.sp-ok{background:#f0fdf4;color:#065f46;}
+.sp-no{background:#fef2f2;color:#991b1b;}
+.sp-pend{background:#fefce8;color:#854d0e;}
+/* ─── RESPONSIVE LAYOUT ─── */
+.app{
+  max-width:1100px;margin:0 auto;padding:10px;
+  height:100vh;flex-direction:column;overflow:hidden;
+}
+.app-body{flex:1;overflow-y:auto;overflow-x:hidden;padding-bottom:8px;}
+.header{flex-shrink:0;border-radius:var(--r);padding:10px 14px;margin-bottom:8px;}
+.tab-bar{flex-shrink:0;display:flex;gap:6px;margin-bottom:8px;}
+.tab{flex:1;padding:8px 4px;text-align:center;font-size:13px;font-weight:500;border-radius:var(--r);border:1.5px solid var(--gray-bd);background:var(--card);color:var(--tx3);cursor:pointer;transition:all .15s;white-space:nowrap;}
+
+.cal-wrap{overflow-x:auto;overflow-y:visible;position:relative;-webkit-overflow-scrolling:touch;}
+.cal-wrap-inner{transform-origin:top left;will-change:transform;display:inline-block;min-width:100%;}
+.zoom-controls{display:flex;align-items:center;gap:2px;background:rgba(255,255,255,.95);border:1px solid var(--gray-bd);border-radius:20px;padding:3px 6px;box-shadow:0 1px 4px rgba(0,0,0,.1);}
+.zoom-btn{background:none;border:none;cursor:pointer;font-size:16px;line-height:1;padding:2px 6px;color:var(--blue);border-radius:6px;transition:background .1s;font-weight:700;user-select:none;}
+.zoom-btn:hover{background:var(--blue-lt);}
+.zoom-btn:disabled{color:#d1d5db;cursor:default;}
+.zoom-level{font-size:11px;font-weight:700;color:var(--tx3);min-width:34px;text-align:center;font-family:'DM Mono',monospace;}
+/* slot height = --slot-h controlled by applyZoom() */
+.slot-course{font-size:10px;}
+.time-lbl{font-size:8px;}
+
+@media(max-width:900px){
+  .blocks-grid{grid-template-columns:1fr!important;}
+  .cfg-grid{grid-template-columns:1fr!important;}
+}
+@media(max-width:600px){
+  .app{padding:6px;}
+  .header{padding:9px 11px;}
+  .header-title{font-size:14px;}
+  .header-sub{display:none;}
+  .hdr-btn{padding:5px 8px;font-size:12px;}
+  .tab{font-size:10px;padding:7px 2px;}
+  .btn-row{flex-direction:column;}
+  .setup-wrap-wide .blocks-grid{grid-template-columns:1fr!important;}
+  .user-nm{display:none;}
+  .week-nav{flex-wrap:wrap;gap:6px;}
+  .week-nav span{font-size:12px;order:-1;width:100%;text-align:center;}
+  .sync-badge{display:none;}
+  .slot{min-height:var(--slot-h);}
+  .block-row{grid-template-columns:1fr 70px 70px auto auto;}
+  .blocks-hdr{grid-template-columns:1fr 70px 70px auto auto;}
+  .zoom-controls{margin-left:auto;}
+}
+@media(max-width:420px){
+  .tab{font-size:9px;padding:6px 2px;}
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════
+     PORTAL
+══════════════════════════════════════════ -->
+<div id="portalScreen" style="display:flex">
+<style>
+#portalScreen{
+  min-height:100vh;flex-direction:column;align-items:center;justify-content:center;
+  background:#f8f9fc;position:relative;overflow:hidden;
+}
+#portalScreen::before{
+  content:'';position:absolute;inset:0;
+  background:
+    radial-gradient(ellipse at 20% 10%, rgba(26,86,219,.06) 0%, transparent 55%),
+    radial-gradient(ellipse at 80% 90%, rgba(5,150,105,.05) 0%, transparent 55%);
+  pointer-events:none;
+}
+.portal-card{
+  position:relative;z-index:2;background:#fff;border:1px solid #e5e7eb;border-radius:20px;
+  padding:44px 40px 36px;width:100%;max-width:380px;
+  box-shadow:0 4px 32px rgba(0,0,0,.07);
+  animation:portalIn .4s cubic-bezier(.34,1.4,.64,1) both;text-align:center;
+}
+@keyframes portalIn{from{opacity:0;transform:translateY(18px) scale(.97)}to{opacity:1;transform:none}}
+.portal-icon{width:60px;height:60px;border-radius:16px;background:linear-gradient(135deg,#1a56db,#1d8cf8);display:inline-flex;align-items:center;justify-content:center;font-size:28px;margin-bottom:20px;box-shadow:0 6px 20px rgba(26,86,219,.28);}
+.portal-title{font-size:20px;font-weight:700;color:#111827;letter-spacing:-.02em;margin-bottom:6px;}
+.portal-sub{font-size:13px;color:#9ca3af;margin-bottom:32px;line-height:1.5;}
+.portal-btn-primary{width:100%;padding:13px;font-size:15px;font-weight:700;border:none;border-radius:10px;cursor:pointer;background:linear-gradient(135deg,#1a56db,#1d8cf8);color:#fff;box-shadow:0 4px 16px rgba(26,86,219,.3);transition:opacity .15s,transform .1s;margin-bottom:10px;display:block;}
+.portal-btn-primary:hover{opacity:.9;}
+.portal-btn-primary:active{transform:scale(.98);}
+.portal-btn-secondary{width:100%;padding:12px;font-size:14px;font-weight:500;cursor:pointer;background:#f3f4f6;border:none;border-radius:10px;color:#4b5563;transition:background .15s;display:block;}
+.portal-btn-secondary:hover{background:#e9eaec;}
+.portal-hint{font-size:11px;color:#d1d5db;margin-top:18px;}
+</style>
+<div class="portal-card">
+  <div class="portal-icon">🖥️</div>
+  <div class="portal-title">Taller de Computación</div>
+  <div class="portal-sub">Sistema de Gestión de Laboratorio</div>
+  <button class="portal-btn-primary" onclick="portalGoApp()">Iniciar sesión</button>
+  <button class="portal-btn-secondary" onclick="portalGuestMode()">Continuar sin cuenta</button>
+  <div class="portal-hint">Lun–Vie · Básica &amp; Media · Sistema de Alertas</div>
+</div>
+</div>
+
+<div id="authScreen">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="auth-icon">🖥️</div>
+      <h1>Taller de Computación</h1>
+      <p>Gestión de laboratorio escolar</p>
+    </div>
+    <div class="fb-notice" id="fbNotice">
+      ⚠️ <b>Firebase no configurado.</b><br>
+      Por ahora puedes usar <b>Continuar sin cuenta</b> (solo guarda localmente).
+    </div>
+    <div class="auth-tabs">
+      <div class="auth-tab active" id="tabLogin" onclick="switchTab('login')">Iniciar sesión</div>
+      <div class="auth-tab" id="tabReg" onclick="switchTab('reg')">Crear cuenta</div>
+    </div>
+    <div class="auth-err" id="authErr"></div>
+    <div id="panelLogin">
+      <div class="fr"><label>Correo electrónico</label>
+        <input class="inp" id="lEmail" type="email" placeholder="tucorreo@gmail.com" autocomplete="email"/>
+      </div>
+      <div class="fr"><label>Contraseña</label>
+        <input class="inp" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"/>
+      </div>
+      <button class="btn-auth" onclick="doLogin()">Entrar →</button>
+      <div class="auth-sep"><span>o</span></div>
+      <button class="btn-auth ghost" onclick="doGuest()">Continuar sin cuenta (local)</button>
+    </div>
+    <div id="panelReg" style="display:none">
+      <div class="fr"><label>Nombre completo</label>
+        <input class="inp" id="rName" type="text" placeholder="Ej: María González"/>
+      </div>
+      <div class="fr"><label>Correo electrónico</label>
+        <input class="inp" id="rEmail" type="email" placeholder="tucorreo@gmail.com" autocomplete="email"/>
+      </div>
+      <div class="fr"><label>Contraseña (mín. 6 caracteres)</label>
+        <input class="inp" id="rPass" type="password" placeholder="••••••••" autocomplete="new-password"/>
+      </div>
+      <div class="fr"><label>Confirmar contraseña</label>
+        <input class="inp" id="rPass2" type="password" placeholder="••••••••"/>
+      </div>
+      <button class="btn-auth" onclick="doRegister()">Crear cuenta ✓</button>
+      <div class="auth-sep"><span>o</span></div>
+      <button class="btn-auth ghost" onclick="doGuest()">Continuar sin cuenta (local)</button>
+    </div>
+  </div>
+</div>
+
+<div class="app" id="app" style="height:100vh;display:none;flex-direction:column;overflow:hidden">
+  <div class="app-body" id="appBody">
+    <div id="setupView"></div>
+    <div id="mainView" style="display:none;"></div>
+    <div id="configView" style="display:none;"></div>
+  </div>
+  <div class="modal-bg" id="bookModal">
+    <div class="modal">
+      <h3 id="bookTitle">Agendar clase</h3>
+      <div class="fr"><label>Curso / Asignatura</label>
+        <input class="inp" id="bCourse" placeholder="Ej: 5°A — Tecnología" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"/>
+      </div>
+      <div class="fr"><label>Nivel</label>
+        <select class="inp" id="bLevel">
+          <option value="basica">Educación Básica</option>
+          <option value="media">Educación Media</option>
+        </select>
+      </div>
+      <div class="fr"><label>Profesor a cargo</label>
+        <input class="inp" id="bTeacher" placeholder="Nombre del profesor (opcional)"/>
+      </div>
+      <div class="btn-row">
+        <button class="btn-ghost" style="flex:1" onclick="closeBook()">Cancelar</button>
+        <button id="bDeleteBtn" class="btn" style="flex:0 0 auto;background:#fee2e2;color:#991b1b;border:none;padding:10px 14px;display:none" onclick="deleteFromModal()">🗑️</button>
+        <button class="btn btn-blue" id="bSaveBtn" style="flex:1" onclick="saveBook()">Agendar ✓</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════
+// CONSTANTES FIJAS — GAS URL fijado permanentemente
+// ══════════════════════════════════════════
+const FIXED_GAS_URL = 'https://script.google.com/macros/s/AKfycbznQRLWH78spmEY0O0xAYGdDiAD2pn8YpitxsNeuv-crWGYTpfCFcEN2GMA7kN1GsRb/exec';
+
+// EmailJS config
+const EJS = {
+  publicKey:  '9IkGVkX0OIP3UILkN',
+  serviceId:  'service_7gr4ldl',
+  templateId: 'template_8qka8g4'
+};
+
+// ══════════════════════════════════════════
+// GLOBALS
+// ══════════════════════════════════════════
+window._appCfg  = null;
+window._appData = { bookings:{}, tickets:{}, notified:{}, notes:{}, ots:{} };
+window._currentUser = null;
+window._lastSave    = 0;
+window._guestMode   = false;
+window._appMounted  = null;
+
+const LS  = k => { try{ return localStorage.getItem('tc3_'+k); }catch(e){ return null; } };
+const LSS = (k,v) => { try{ localStorage.setItem('tc3_'+k, typeof v==='string'?v:JSON.stringify(v)); }catch(e){} };
+
+// Log de notificaciones
+window._notifLog = [];
+function addNotifLog(msg, type='ok'){
+  // type: 'ok' | 'err' | 'warn'
+  const ts = new Date().toLocaleTimeString('es-CL');
+  window._notifLog.unshift({ msg, type, ts });
+  if(window._notifLog.length > 50) window._notifLog.pop();
+  const nl = document.getElementById('notifLogPanel');
+  if(nl) renderNotifLog();
+  // También a consola
+  if(type==='err') console.error('[Notif]', msg);
+  else if(type==='warn') console.warn('[Notif]', msg);
+  else console.log('[Notif]', msg);
+}
+
+// ══════════════════════════════════════════
+// DEFAULTS
+// ══════════════════════════════════════════
+const DEF_B=[
+  {label:'Bloque 1',start:'08:00',end:'08:45',isBreak:false},
+  {label:'Bloque 2',start:'08:50',end:'09:35',isBreak:false},
+  {label:'Bloque 3',start:'09:40',end:'10:25',isBreak:false},
+  {label:'Recreo',  start:'10:25',end:'10:45',isBreak:true },
+  {label:'Bloque 4',start:'10:45',end:'11:30',isBreak:false},
+  {label:'Bloque 5',start:'11:35',end:'12:20',isBreak:false},
+  {label:'Almuerzo',start:'12:20',end:'13:00',isBreak:true },
+  {label:'Bloque 6',start:'13:00',end:'13:45',isBreak:false},
+  {label:'Bloque 7',start:'13:50',end:'14:35',isBreak:false},
+  {label:'Bloque 8',start:'14:40',end:'15:25',isBreak:false},
+];
+const DEF_M=[
+  {label:'Bloque 1',start:'08:00',end:'08:50',isBreak:false},
+  {label:'Bloque 2',start:'08:55',end:'09:45',isBreak:false},
+  {label:'Recreo',  start:'09:45',end:'10:05',isBreak:true },
+  {label:'Bloque 3',start:'10:05',end:'10:55',isBreak:false},
+  {label:'Bloque 4',start:'11:00',end:'11:50',isBreak:false},
+  {label:'Bloque 5',start:'11:55',end:'12:45',isBreak:false},
+  {label:'Almuerzo',start:'12:45',end:'13:30',isBreak:true },
+  {label:'Bloque 6',start:'13:30',end:'14:20',isBreak:false},
+  {label:'Bloque 7',start:'14:25',end:'15:15',isBreak:false},
+];
+
+// ══════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════
+let cfg  = null;
+let data = window._appData;
+let ui   = { level:'basica', weekOffset:0, pendingSlot:null, calZoom:3, weLvl:'basica' };
+let ejsReady = false;
+
+// GAS_URL: siempre usa la URL fija, ignora localStorage para no haber conflictos
+let GAS_URL = FIXED_GAS_URL;
+
+// Zoom levels — alturas de slot en px (zoom vertical puro)
+const ZOOM_HEIGHTS = [38, 50, 62, 78, 96];
+
+function applyZoom(){
+  const slotH = ZOOM_HEIGHTS[ui.calZoom - 1];
+  document.documentElement.style.setProperty('--slot-h', slotH + 'px');
+  ['calGridWrap','calGridWEWrap'].forEach(id => {
+    const inner = document.getElementById(id);
+    if(!inner) return;
+    inner.style.transform = '';
+    inner.style.width = '';
+    inner.style.height = '';
+    const outer = inner.parentElement;
+    if(outer){ outer.style.height = ''; outer.style.overflowX = 'auto'; }
+  });
+  const pct = Math.round((slotH / 62) * 100);
+  document.querySelectorAll('.zoom-level').forEach(el => {
+    el.textContent = `${pct}%`;
+  });
+  document.querySelectorAll('.zoom-btn[data-dir="in"]').forEach(b  => b.disabled = ui.calZoom >= 5);
+  document.querySelectorAll('.zoom-btn[data-dir="out"]').forEach(b => b.disabled = ui.calZoom <= 1);
+  try{ localStorage.setItem('tc3_zoom', ui.calZoom); }catch(e){}
+}
+
+function zoomIn()  { if(ui.calZoom < 5){ ui.calZoom++; applyZoom(); } }
+function zoomOut() { if(ui.calZoom > 1){ ui.calZoom--; applyZoom(); } }
+
+function initPinch(){
+  let _lastDist = null;
+  document.addEventListener('touchstart', e => {
+    if(e.touches.length === 2){
+      _lastDist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+    }
+  }, {passive:true});
+  document.addEventListener('touchmove', e => {
+    if(e.touches.length !== 2 || _lastDist === null) return;
+    const dist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+    const delta = dist - _lastDist;
+    if(Math.abs(delta) > 18){
+      if(delta > 0) zoomIn(); else zoomOut();
+      _lastDist = dist;
+    }
+  }, {passive:true});
+  document.addEventListener('touchend', () => { _lastDist = null; }, {passive:true});
+  try{
+    const saved = parseInt(localStorage.getItem('tc3_zoom'));
+    if(saved >= 1 && saved <= 5) ui.calZoom = saved;
+  }catch(e){}
+}
+window.addEventListener('load', initPinch);
+
+function loadAll(){
+  try{ cfg=window._appCfg||JSON.parse(LS('cfg')); window._appCfg=cfg; }catch(e){ cfg=null; }
+  // Asegurar correo por defecto si no está configurado
+  if(cfg && !cfg.email){ cfg.email='byron.suazo@colegiomariagriseldavalle.cl'; }
+  try{ data.bookings=window._appData.bookings||JSON.parse(LS('bookings')||'{}'); }catch(e){}
+  try{ data.tickets =window._appData.tickets ||JSON.parse(LS('tickets') ||'{}'); }catch(e){}
+  try{ data.notified=window._appData.notified||JSON.parse(LS('notified')||'{}'); }catch(e){}
+  try{ data.notes   =window._appData.notes   ||JSON.parse(LS('notes')   ||'{}'); }catch(e){}
+  try{ data.ots     =window._appData.ots     ||JSON.parse(LS('ots')     ||'{}'); }catch(e){}
+}
+function saveData(){
+  LSS('bookings',data.bookings);
+  LSS('tickets', data.tickets);
+  LSS('notified',data.notified);
+  LSS('notes',data.notes);
+  LSS('ots',data.ots);
+  cloudSave();
+}
+function saveCfg(){ window._appCfg=cfg; LSS('cfg',cfg); cloudSave(); }
+
+let _saveTimer=null;
+function cloudSave(){
+  if(window._guestMode||!window._currentUser) return;
+  setSyncStatus('ing');
+  clearTimeout(_saveTimer);
+  _saveTimer=setTimeout(async()=>{
+    try{
+      window._appData=data; window._appCfg=cfg;
+      window._lastSave=Date.now();
+      if(window.saveToCloud) await window.saveToCloud(window._currentUser.uid);
+      setSyncStatus('ok');
+    }catch(e){ console.error(e); setSyncStatus('off'); }
+  },1200);
+}
+function setSyncStatus(s){
+  const el=document.getElementById('syncBadge'); if(!el) return;
+  if(s==='ok') { el.className='sync-badge s-ok';  el.innerHTML='☁️ Sincronizado'; }
+  if(s==='ing'){ el.className='sync-badge s-ing'; el.innerHTML='↻ Guardando…'; }
+  if(s==='off'){ el.className='sync-badge s-off'; el.innerHTML='⚡ Solo local'; }
+}
+
+// ══════════════════════════════════════════
+// PORTAL NAVIGATION
+// ══════════════════════════════════════════
+function portalGoApp(){
+  document.getElementById('portalScreen').style.display='none';
+  window.showAuthScreen();
+}
+function portalGuestMode(){
+  document.getElementById('portalScreen').style.display='none';
+  doGuest();
+}
+
+// ══════════════════════════════════════════
+// AUTH UI
+// ══════════════════════════════════════════
+function switchTab(t){
+  document.getElementById('tabLogin')?.classList.toggle('active',t==='login');
+  document.getElementById('tabReg')?.classList.toggle('active',t==='reg');
+  document.getElementById('panelLogin').style.display=t==='login'?'':'none';
+  document.getElementById('panelReg').style.display=t==='reg'?'':'none';
+  document.getElementById('authErr').classList.remove('show');
+}
+function authErr(msg){ const el=document.getElementById('authErr'); el.textContent=msg; el.classList.add('show'); }
+
+window.showAuthScreen=function(){
+  document.getElementById('portalScreen').style.display='none';
+  document.getElementById('authScreen').style.display='flex';
+  document.getElementById('app').style.display='none';
+  if(!window._fbReady) document.getElementById('fbNotice').classList.add('show');
+};
+window.showApp=function(){
+  document.getElementById('authScreen').style.display='none';
+  document.getElementById('app').style.display='flex';
+  loadAll();
+  if(cfg&&cfg.blocksBasica&&cfg.blocksMedia){
+    document.getElementById('setupView').style.display='none';
+    document.getElementById('mainView').style.display='';
+    renderMain();
+  } else {
+    document.getElementById('mainView').style.display='none';
+    document.getElementById('setupView').style.display='';
+    renderSetup();
+  }
+  window._appMounted=renderMain;
+  // Inicializar EmailJS primero, luego arrancar el motor de notificaciones
+  initEmailJS(() => {
+    startNotifEngine();
+  });
+  setInterval(()=>{ if(!window._guestMode) cloudSave(); },120000);
+  requestNotifPermission();
+  // Sincronizar GAS con los bookings actuales al iniciar
+  setTimeout(() => syncToGAS(), 3000);
+};
+
+window.addEventListener('load',()=>{
+  setTimeout(()=>{
+    if(!window._currentUser && !window._guestMode){
+      document.getElementById('portalScreen').style.display='flex';
+    }
+  },2500);
+});
+
+const FB_ERR={
+  'auth/user-not-found':'Usuario no encontrado.',
+  'auth/wrong-password':'Contraseña incorrecta.',
+  'auth/invalid-email':'Correo no válido.',
+  'auth/too-many-requests':'Demasiados intentos. Espera un momento.',
+  'auth/invalid-credential':'Correo o contraseña incorrectos.',
+  'auth/email-already-in-use':'Este correo ya está registrado.',
+  'auth/weak-password':'Contraseña muy débil (mínimo 6 caracteres).',
+};
+
+async function doLogin(){
+  document.getElementById('authErr').classList.remove('show');
+  const email=document.getElementById('lEmail').value.trim();
+  const pass =document.getElementById('lPass').value;
+  if(!email||!pass){ authErr('Ingresa tu correo y contraseña.'); return; }
+  if(!window._fbReady){ authErr('Firebase no está configurado. Usa "Continuar sin cuenta".'); return; }
+  try{
+    await window._fb.fns.signInWithEmailAndPassword(window._fb.auth,email,pass);
+  }catch(e){ authErr(FB_ERR[e.code]||`Error: ${e.message}`); }
+}
+async function doRegister(){
+  document.getElementById('authErr').classList.remove('show');
+  const name =document.getElementById('rName').value.trim();
+  const email=document.getElementById('rEmail').value.trim();
+  const pass =document.getElementById('rPass').value;
+  const pass2=document.getElementById('rPass2').value;
+  if(!name||!email||!pass){ authErr('Completa todos los campos.'); return; }
+  if(pass.length<6){ authErr('Contraseña mínimo 6 caracteres.'); return; }
+  if(pass!==pass2){ authErr('Las contraseñas no coinciden.'); return; }
+  if(!window._fbReady){ authErr('Firebase no configurado. Usa "Continuar sin cuenta".'); return; }
+  try{
+    const cred=await window._fb.fns.createUserWithEmailAndPassword(window._fb.auth,email,pass);
+    await window._fb.fns.updateProfile(cred.user,{displayName:name});
+  }catch(e){ authErr(FB_ERR[e.code]||`Error: ${e.message}`); }
+}
+function doGuest(){
+  window._guestMode=true; window._currentUser=null;
+  window.showApp();
+}
+async function doLogout(){
+  if(window._guestMode){ window._guestMode=false; window.showAuthScreen(); return; }
+  try{
+    if(window._unsubSync) window._unsubSync();
+    stopNotifEngine();
+    await window._fb.fns.signOut(window._fb.auth);
+  }catch(e){ console.error(e); }
+}
+
+// ══════════════════════════════════════════
+// UTILS
+// ══════════════════════════════════════════
+const DAYS=['Lun','Mar','Mié','Jue','Vie'];
+
+function toAmPm(t){
+  if(!t||typeof t!=='string') return t||'';
+  const [hh,mm]=t.split(':').map(Number);
+  const p=hh<12?'AM':'PM';
+  const h=hh===0?12:hh>12?hh-12:hh;
+  return `${h}:${String(mm).padStart(2,'0')} ${p}`;
+}
+function dStr(d){
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function isToday(d){ return dStr(d)===dStr(new Date()); }
+function getWeekDates(off){
+  const n=new Date(),dy=n.getDay(),diff=dy===0?-6:1-dy;
+  const mon=new Date(n); mon.setDate(n.getDate()+diff+(off*7)); mon.setHours(0,0,0,0);
+  return Array.from({length:5},(_,i)=>{ const d=new Date(mon); d.setDate(mon.getDate()+i); return d; });
+}
+function getWeekendDates(off){
+  const n=new Date(),dy=n.getDay();
+  const diffToSat=dy===6?0:(6-dy);
+  const sat=new Date(n); sat.setDate(n.getDate()+diffToSat+(off*7)); sat.setHours(0,0,0,0);
+  const sun=new Date(sat); sun.setDate(sat.getDate()+1);
+  return [sat,sun];
+}
+function slotKey(ds,prefix,bi){ return `${ds}__${prefix}${bi}`; }
+function getBlocks(level){ return level==='basica'?cfg.blocksBasica:cfg.blocksMedia; }
+function isPastSlot(d,bi,level){
+  const bl=getBlocks(level)[bi]; if(!bl||bl.isBreak) return false;
+  const [h,m]=bl.end.split(':').map(Number);
+  const t=new Date(d); t.setHours(h,m,0,0);
+  return t<new Date();
+}
+function showToast(msg,dur=2500){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),dur);
+}
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function getUserInitials(){
+  if(window._guestMode) return '?';
+  const u=window._currentUser; if(!u) return '?';
+  return (u.displayName||u.email||'U').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+}
+function getUserLabel(){
+  if(window._guestMode) return 'Modo local';
+  const u=window._currentUser; if(!u) return '';
+  return u.displayName||u.email;
+}
+
+// ══════════════════════════════════════════
+// DUPLICATE
+// ══════════════════════════════════════════
+function duplicateBook(key,ds,bi,level){
+  event.stopPropagation();
+  const bk=data.bookings[key]; if(!bk) return;
+  const blocks=getBlocks(level);
+  let nextBi=-1;
+  for(let i=bi+1;i<blocks.length;i++){ if(!blocks[i].isBreak){ nextBi=i; break; } }
+  if(nextBi===-1){ showToast('No hay bloque siguiente disponible'); return; }
+  const prefix=level==='basica'?'b':'m';
+  const newKey=slotKey(ds,prefix,nextBi);
+  if(data.bookings[newKey]){ showToast('⚠️ El siguiente bloque ya está ocupado'); return; }
+  const blNext=blocks[nextBi];
+  data.bookings[newKey]={course:bk.course,level:bk.level,teacher:bk.teacher,ds,bi:nextBi,prefix,startTime:blNext.start,endTime:blNext.end};
+  saveData(); renderMain();
+  showToast(`✓ Duplicado → ${blNext.label} (${toAmPm(blNext.start)})`);
+}
+
+// ══════════════════════════════════════════
+// SETUP
+// ══════════════════════════════════════════
+let ss=0;
+let sd={ schoolName:'',email:'byron.suazo@colegiomariagriseldavalle.cl',minutes:15,
+  blocksBasica:JSON.parse(JSON.stringify(DEF_B)),
+  blocksMedia: JSON.parse(JSON.stringify(DEF_M)) };
+
+function renderSetup(){
+  const v=document.getElementById('setupView');
+  if(ss===0){
+    v.innerHTML=`<div class="setup-wrap"><div class="card" style="text-align:center">
+      <div style="font-size:44px;margin-bottom:10px">🖥️</div>
+      <div style="font-size:22px;font-weight:700;margin-bottom:6px">Taller de Computación</div>
+      <div style="font-size:13px;color:var(--tx3);margin-bottom:1.5rem">Configuración inicial — 3 pasos rápidos</div>
+      <div class="steps"><div class="stp act">1. Establecimiento</div><div class="stp">2. Horarios</div><div class="stp">3. Notificaciones</div></div>
+      <div class="fr" style="text-align:left"><label>Nombre del establecimiento</label>
+        <input class="inp" id="s_school" placeholder="Ej: Escuela Municipal Nº12" value="${esc(sd.schoolName)}"/>
+      </div>
+      <div class="btn-row" style="justify-content:flex-end"><button class="btn btn-blue" onclick="sNext(0)">Siguiente →</button></div>
+    </div></div>`;
+  } else if(ss===1){
+    v.innerHTML=`<div class="setup-wrap-wide"><div class="card">
+      <div class="steps"><div class="stp done">1. Establecimiento</div><div class="stp act">2. Horarios</div><div class="stp">3. Notificaciones</div></div>
+      <p style="font-size:13px;color:var(--tx3);margin-bottom:14px">Edita los bloques horarios. Usa ☕ para marcar recreos/almuerzos.</p>
+      <div class="blocks-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div>
+          <div class="cfg-title" style="color:var(--blue-tx);margin-top:0">📘 Educación Básica</div>
+          <div class="blocks-hdr"><span>Nombre</span><span>Inicio</span><span>Fin</span><span></span><span></span></div>
+          <div id="s_bb"></div><button class="add-btn" onclick="addSBlock('basica')">+ Agregar fila</button>
+        </div>
+        <div>
+          <div class="cfg-title" style="color:var(--green-tx);margin-top:0">📗 Educación Media</div>
+          <div class="blocks-hdr"><span>Nombre</span><span>Inicio</span><span>Fin</span><span></span><span></span></div>
+          <div id="s_bm"></div><button class="add-btn" onclick="addSBlock('media')">+ Agregar fila</button>
+        </div>
+      </div>
+      <div class="btn-row" style="justify-content:space-between">
+        <button class="btn-ghost" onclick="ss=0;renderSetup()">← Atrás</button>
+        <button class="btn btn-blue" onclick="sNext(1)">Siguiente →</button>
+      </div>
+    </div></div>`;
+    renderSBlocks('basica'); renderSBlocks('media');
+  } else {
+    v.innerHTML=`<div class="setup-wrap"><div class="card">
+      <div class="steps"><div class="stp done">1. Establecimiento</div><div class="stp done">2. Horarios</div><div class="stp act">3. Notificaciones</div></div>
+      <div class="fr"><label>Tu correo para los recordatorios</label>
+        <input class="inp" id="s_email" type="email" placeholder="tucorreo@gmail.com" value="${esc(sd.email)}"/>
+      </div>
+      <div class="fr"><label>⏰ Aviso anticipado</label>
+        <select class="inp" id="s_mins">
+          <option value="0" ${sd.minutes===0?'selected':''}>Solo aviso de 1 min (abrir sala)</option>
+          ${[5,10,15,20,30].map(n=>`<option value="${n}" ${n===sd.minutes?'selected':''}>${n} minutos antes + 1 min</option>`).join('')}
+        </select>
+        <div style="font-size:11px;color:var(--tx3);margin-top:5px">✉️ Siempre recibirás un correo <b>1 minuto antes</b> para abrir el taller.</div>
+      </div>
+      <div class="btn-row" style="justify-content:space-between;margin-top:16px">
+        <button class="btn-ghost" onclick="ss=1;renderSetup()">← Atrás</button>
+        <button class="btn btn-green" onclick="sNext(2)">¡Comenzar! ✓</button>
+      </div>
+    </div></div>`;
+  }
+}
+
+function renderSBlocks(level){
+  const arr=level==='basica'?sd.blocksBasica:sd.blocksMedia;
+  const cid=level==='basica'?'s_bb':'s_bm';
+  const c=document.getElementById(cid); if(!c) return;
+  const key=level==='basica'?'blocksBasica':'blocksMedia';
+  c.innerHTML=arr.map((b,i)=>`
+    <div class="block-row ${b.isBreak?'brk-row':''}">
+      <input class="inp-sm" value="${esc(b.label)}" onchange="sd.${key}[${i}].label=this.value"/>
+      <input class="inp-sm" type="time" value="${b.start}" onchange="sd.${key}[${i}].start=this.value"/>
+      <input class="inp-sm" type="time" value="${b.end}"   onchange="sd.${key}[${i}].end=this.value"/>
+      <button class="icon-btn" onclick="toggleSBreak('${level}',${i})">${b.isBreak?'🌿':'☕'}</button>
+      <button class="del-btn"  onclick="delSBlock('${level}',${i})">✕</button>
+    </div>`).join('');
+}
+function toggleSBreak(lv,i){ const a=lv==='basica'?sd.blocksBasica:sd.blocksMedia; a[i].isBreak=!a[i].isBreak; renderSBlocks(lv); }
+function addSBlock(lv){ const a=lv==='basica'?sd.blocksBasica:sd.blocksMedia; const l=a[a.length-1]; a.push({label:`Bloque ${a.length+1}`,start:l?l.end:'08:00',end:'09:00',isBreak:false}); renderSBlocks(lv); }
+function delSBlock(lv,i){ const a=lv==='basica'?sd.blocksBasica:sd.blocksMedia; if(a.length<=1){showToast('Mínimo una fila');return;} a.splice(i,1); renderSBlocks(lv); }
+function sNext(step){
+  if(step===0){
+    sd.schoolName=document.getElementById('s_school').value.trim();
+    if(!sd.schoolName){ showToast('Ingresa el nombre del establecimiento'); return; }
+    ss=1; renderSetup();
+  } else if(step===1){
+    ss=2; renderSetup();
+  } else {
+    sd.email=document.getElementById('s_email').value.trim();
+    sd.minutes=parseInt(document.getElementById('s_mins').value);
+    if(!sd.email){ showToast('Ingresa un correo válido'); return; }
+    cfg={schoolName:sd.schoolName,email:sd.email,minutes:sd.minutes,
+         blocksBasica:sd.blocksBasica,blocksMedia:sd.blocksMedia};
+    saveCfg();
+    document.getElementById('setupView').style.display='none';
+    document.getElementById('mainView').style.display='';
+    renderMain();
+  }
+}
+
+// ══════════════════════════════════════════
+// MAIN VIEW
+// ══════════════════════════════════════════
+function renderMain(){
+  if(!cfg) return;
+  const dates=getWeekDates(ui.weekOffset);
+  const datesWE=getWeekendDates(ui.weekOffset);
+  const f=dates[0],l=dates[4];
+  const wl=`${f.getDate()}/${f.getMonth()+1} — ${l.getDate()}/${l.getMonth()+1}/${l.getFullYear()}`;
+  const hd=new Date().toLocaleDateString('es-CL',{weekday:'long',day:'numeric',month:'long'});
+  const needPerm=('Notification' in window) && Notification.permission==='default';
+  const syncLabel=window._guestMode?'⚡ Solo local':'☁️ Nube';
+  const syncCls  =window._guestMode?'sync-badge s-off':'sync-badge s-ok';
+  const gasOk = !!GAS_URL;
+
+  document.getElementById('mainView').innerHTML=`
+    <div class="header" style="position:sticky;top:0;z-index:50;margin-bottom:8px;border-radius:var(--r)">
+      <div>
+        <div class="header-title">🖥️ ${esc(cfg.schoolName)}</div>
+        <div class="header-sub">${hd.charAt(0).toUpperCase()+hd.slice(1)}</div>
+      </div>
+      <div class="hdr-btns">
+        <span class="${syncCls}" id="syncBadge">${syncLabel}</span>
+        <span style="background:${gasOk?'rgba(209,250,229,.9)':'rgba(254,226,226,.9)'};color:${gasOk?'#065f46':'#991b1b'};padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;">
+          ${gasOk?'☁️ GAS Activo':'⚠️ Sin GAS'}
+        </span>
+        <button class="hdr-btn" onclick="exportPDF()">📄 PDF</button>
+        <button class="hdr-btn" onclick="printWeek()" title="Imprimir semana">🖨️</button>
+        <div class="user-menu" id="userMenu">
+          <div class="user-chip" onclick="toggleUD()">
+            <div class="user-av">${getUserInitials()}</div>
+            <span class="user-nm">${esc(getUserLabel())}</span>
+          </div>
+          <div class="user-dd" id="userDD">
+            <div class="ud-info">Sesión iniciada como:<br><b>${esc(getUserLabel())}</b>${window._currentUser&&window._currentUser.email?`<br><span style="font-size:11px">${esc(window._currentUser.email)}</span>`:''}</div>
+            <div class="ud-sep"></div>
+            <div class="ud-item" onclick="testEmail()">📧 Probar notificación</div>
+            <div class="ud-item" onclick="showCfg()">⚙️ Configuración</div>
+            <div class="ud-sep"></div>
+            <div class="ud-item danger" onclick="doLogout()">← Cerrar sesión</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    ${needPerm?`<div class="notif-banner" style="margin:0 0 8px;position:sticky;top:60px;z-index:39">🔔 Activa las notificaciones del navegador <button onclick="requestNotifPermission()">Activar</button></div>`:''}
+    ${(()=>{
+      const dates2=getWeekDates(ui.weekOffset);
+      const allD=[...dates2,...getWeekendDates(ui.weekOffset)];
+      let tot=0,ok=0,no=0;
+      allD.forEach(d=>{
+        const ds=dStr(d),isWE=d.getDay()===0||d.getDay()===6;
+        getAllBookingsForDay(ds,isWE).forEach(item=>{
+          tot++;
+          if(data.tickets[item.key]==='ok') ok++;
+          else if(data.tickets[item.key]==='no') no++;
+        });
+      });
+      const pend=tot-ok-no;
+      if(!tot) return '';
+      return `<div class="stats-strip">
+        <div class="stat-pill sp-tot"><span>${tot}</span> clase${tot!==1?'s':''}</div>
+        <div class="stat-pill sp-ok"><span>${ok}</span> asistió</div>
+        <div class="stat-pill sp-no"><span>${no}</span> no asistió</div>
+        <div class="stat-pill sp-pend"><span>${pend}</span> pendiente${pend!==1?'s':''}</div>
+      </div>`;
+    })()}
+    <div class="tab-bar" style="position:sticky;top:62px;z-index:40;background:var(--bg);padding:4px 0;margin:0 0 8px">
+      <div class="tab ${ui.level==='basica'?'ab':''}" onclick="setLevel('basica')">📘 Básica</div>
+      <div class="tab ${ui.level==='media'?'am':''}"  onclick="setLevel('media')">📗 Media</div>
+      <div class="tab ${ui.level==='todos'?'at':''}"  onclick="setLevel('todos')">📋 Semana</div>
+      <div class="tab ${ui.level==='notas'?'an':''}"  onclick="setLevel('notas')">📝 Notas</div>
+      <div class="tab ${ui.level==='ot'?'aot':''}"    onclick="setLevel('ot')">🔧 OT</div>
+    </div>
+
+    ${ui.level==='notas'?`<div id="notasView"></div>`:ui.level==='todos'?`<div id="semanaView"></div>`:ui.level==='ot'?`<div id="otView"></div>`:`
+
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <div style="flex:1;height:2px;background:linear-gradient(90deg,var(--blue),transparent)"></div>
+      <div style="font-size:12px;font-weight:700;color:var(--blue-tx);background:var(--blue-lt);border:1px solid #93c5fd;border-radius:20px;padding:4px 14px;white-space:nowrap">📅 Lunes a Viernes</div>
+      <div style="flex:1;height:2px;background:linear-gradient(90deg,transparent,var(--blue))"></div>
+    </div>
+    <div class="legend" id="legendRow">
+      <div class="leg"><div class="ldot-sq" style="background:var(--slot);border:1.5px solid var(--slot-bd)"></div>Disponible</div>
+      <div class="leg"><div class="ldot" style="background:#1a56db"></div>Básica</div>
+      <div class="leg"><div class="ldot" style="background:#059669"></div>Media</div>
+      <div class="leg"><div class="ldot-sq" style="background:var(--brk-bg)"></div>Recreo</div>
+      <div style="margin-left:auto;font-size:11px;color:var(--tx3)">Clic = agendar · Clic en reserva = editar</div>
+    </div>
+    <div class="card" style="padding:10px 12px">
+      <div class="week-nav">
+        <button onclick="changeWeek(-1)" title="Semana anterior (←)">← Anterior</button>
+        <span>${wl}</span>
+        <button onclick="changeWeek(0)" title="Ir a semana actual" style="font-size:11px;padding:5px 10px;background:var(--blue-lt);color:var(--blue-tx);border-color:#93c5fd">Hoy</button>
+        <button onclick="changeWeek(1)" title="Semana siguiente (→)">Siguiente →</button>
+        <div class="zoom-controls">
+          <button class="zoom-btn" data-dir="out" onclick="zoomOut()" title="Reducir">−</button>
+          <span class="zoom-level">${Math.round((ZOOM_HEIGHTS[ui.calZoom-1]/62)*100)}%</span>
+          <button class="zoom-btn" data-dir="in" onclick="zoomIn()" title="Ampliar">+</button>
+        </div>
+      </div>
+      <div class="cal-wrap" id="calWrap">
+        <div id="calGridWrap" class="cal-wrap-inner">
+          <div class="cal-grid" id="calGrid" style="grid-template-columns:62px repeat(5,1fr)"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card" id="todayCard"></div>
+    `}`;
+
+  if(ui.level==='notas'){ renderNotas(); }
+  else if(ui.level==='todos'){ renderSemanaView(dates,datesWE); }
+  else if(ui.level==='ot'){ renderOT(); }
+  else {
+    renderGrid(dates);
+    renderToday(dates);
+    applyZoom();
+  }
+  document.addEventListener('click',function od(e){
+    const m=document.getElementById('userMenu');
+    if(m&&!m.contains(e.target)){ const d=document.getElementById('userDD'); if(d) d.classList.remove('open'); document.removeEventListener('click',od); }
+  });
+}
+
+function toggleUD(){ event.stopPropagation(); const d=document.getElementById('userDD'); if(d) d.classList.toggle('open'); }
+
+function renderGrid(dates){
+  const g=document.getElementById('calGrid'); if(!g) return;
+  const dispLv=ui.level==='todos'?'basica':ui.level;
+  const blocks=getBlocks(dispLv);
+
+  // ── Pre-calcular fusiones de bloques consecutivos con el mismo curso ──
+  // skip[bi][di]=true  → esta celda ya la cubre el slot anterior (no renderizar)
+  // span[bi][di]=N     → este slot ocupa N filas
+  const skip = blocks.map(()=> dates.map(()=>false));
+  const span = blocks.map(()=> dates.map(()=>1));
+
+  dates.forEach((d,di)=>{
+    const ds=dStr(d);
+    for(let bi=0;bi<blocks.length;bi++){
+      if(blocks[bi].isBreak || skip[bi][di]) continue;
+      // Obtener booking de este slot
+      const bk1=_getBk(ds,bi,dispLv);
+      if(!bk1) continue;
+      // Buscar siguiente bloque no-recreo sin recreo entre medio
+      let nbi=bi+1;
+      while(nbi<blocks.length && blocks[nbi].isBreak) nbi++;
+      // Si hay un recreo estricto entre bi y nbi → no fusionar
+      const hasBreak = blocks.slice(bi+1,nbi).some(b=>b.isBreak);
+      if(hasBreak || nbi>=blocks.length) continue;
+      const bk2=_getBk(ds,nbi,dispLv);
+      if(bk2 && bk2.course===bk1.course && bk2.teacher===bk1.teacher){
+        span[bi][di]=2;
+        skip[nbi][di]=true;
+      }
+    }
+  });
+
+  // ── Construir HTML usando grid con posicionamiento explícito ──
+  // Necesitamos grid-template-rows explícito para que grid-row span funcione
+  const nonBrkCount = blocks.filter(b=>!b.isBreak).length;
+  const brkCount    = blocks.filter(b=>b.isBreak).length;
+  // grid row 1 = headers; luego una por bloque
+  const rowTemplate = `auto ${blocks.map(()=>'auto').join(' ')}`;
+
+  let html='';
+  // Encabezados (fila 1)
+  html+=`<div style="grid-column:1;grid-row:1"></div>`;
+  dates.forEach((d,i)=>{
+    html+=`<div class="cal-head ${isToday(d)?'today':''}" style="grid-column:${i+2};grid-row:1">${DAYS[i]}<br><b style="font-size:15px">${d.getDate()}</b></div>`;
+  });
+
+  blocks.forEach((bl,bi)=>{
+    const gridRow=bi+2; // fila CSS (1=headers, 2=bloque 0, …)
+    if(bl.isBreak){
+      html+=`<div class="time-lbl" style="grid-column:1;grid-row:${gridRow}"><span style="font-size:8px">${toAmPm(bl.start)}</span></div>`;
+      for(let di=0;di<5;di++){
+        html+=`<div class="slot brk" style="grid-column:${di+2};grid-row:${gridRow}"><div class="brk-lbl">🌿 ${bl.label}</div></div>`;
+      }
+      return;
+    }
+    html+=`<div class="time-lbl" style="grid-column:1;grid-row:${gridRow}">
+      <span style="font-weight:600;font-size:9px">${toAmPm(bl.start)}</span>
+      <span class="time-end">${toAmPm(bl.end)}</span>
+    </div>`;
+
+    dates.forEach((d,di)=>{
+      if(skip[bi][di]) return; // absorbida por el slot de arriba
+      const ds=dStr(d);
+      const sp=span[bi][di]; // 1 o 2
+      let bk=null,bkLv=null,bkKey=null;
+      if(ui.level==='todos'){
+        const kb=slotKey(ds,'b',bi),km=slotKey(ds,'m',bi);
+        if(data.bookings[kb]){ bk=data.bookings[kb]; bkLv='basica'; bkKey=kb; }
+        else if(data.bookings[km]){ bk=data.bookings[km]; bkLv='media'; bkKey=km; }
+      } else {
+        const prefix=ui.level==='basica'?'b':'m';
+        bkKey=slotKey(ds,prefix,bi);
+        bk=data.bookings[bkKey]; bkLv=ui.level;
+      }
+      const ck=bkKey||slotKey(ds,dispLv==='basica'?'b':'m',bi);
+      const past=isPastSlot(d,bi,dispLv);
+      let cls='slot';
+      if(bk) cls+=bkLv==='basica'?' sb':' sm';
+      else if(past) cls+=' is-past';
+      else cls+=' can-click';
+
+      const rowSpanStyle = sp>1
+        ? `grid-column:${di+2};grid-row:${gridRow}/span ${sp};min-height:calc(var(--slot-h)*${sp} + ${(sp-1)*3}px)`
+        : `grid-column:${di+2};grid-row:${gridRow}`;
+
+      let inner='';
+      if(bk){
+        // En celda fusionada mostrar el rango de hora completo
+        const endBl = sp>1 ? blocks[bi + blocks.slice(bi+1).findIndex(b=>!b.isBreak)+1] : null;
+        const timeRange = sp>1 && endBl ? `<div style="font-size:9px;color:${bkLv==='basica'?'#3b82f6':'#10b981'};margin-bottom:2px;font-family:'DM Mono',monospace">${toAmPm(bl.start)}–${toAmPm(endBl.end)}</div>` : '';
+        const spanBadge = sp>1 ? `<div class="span-badge">2 bloques</div>` : '';
+        inner=`${timeRange}${spanBadge}<div style="display:flex;align-items:flex-start;gap:2px">
+          <div style="flex:1;overflow:hidden">
+            <div class="slot-course">${esc(bk.course)}</div>
+            <div class="slot-sub">${esc(bk.teacher||'')}</div>
+          </div>
+          ${sp===1?`<button class="dup-btn" onclick="duplicateBook('${bkKey}','${ds}',${bi},'${bkLv}')" title="Duplicar al siguiente bloque">➕</button>`:''}
+        </div>
+        <div class="trow">
+          <button class="tbtn tok ${data.tickets[ck]==='ok'?'on':''}" onclick="event.stopPropagation();tick('${ck}','ok')">✓</button>
+          <button class="tbtn tno ${data.tickets[ck]==='no'?'on':''}" onclick="event.stopPropagation();tick('${ck}','no')">✕</button>
+        </div>`;
+      } else if(!past){
+        inner=`<div class="slot-plus">+</div>`;
+      }
+      const oc=(!past&&!bk)?`onclick="openBook('${ds}',${bi},'${dispLv}')"`:(bk?`onclick="openBook('${ds}',${bi},'${bkLv||dispLv}',true)"` :'');
+      html+=`<div class="${cls}" style="${rowSpanStyle}" ${oc}>${inner}</div>`;
+    });
+  });
+
+  g.style.gridTemplateRows=rowTemplate;
+  g.innerHTML=html;
+}
+
+// Helper: obtener booking para un slot dado día/bloque/nivel
+function _getBk(ds,bi,dispLv){
+  if(ui.level==='todos'){
+    const kb=slotKey(ds,'b',bi),km=slotKey(ds,'m',bi);
+    return data.bookings[kb]||data.bookings[km]||null;
+  }
+  const prefix=ui.level==='basica'?'b':'m';
+  return data.bookings[slotKey(ds,prefix,bi)]||null;
+}
+
+function renderToday(dates){
+  const s=document.getElementById('todayCard'); if(!s) return;
+  const td=dates.find(d=>isToday(d));
+  const nowH=new Date().getHours(), nowM=new Date().getMinutes();
+  function isNowInSlot(bl){ const [sh,sm]=bl.start.split(':').map(Number),[eh,em]=bl.end.split(':').map(Number); const n=nowH*60+nowM; return n>=sh*60+sm&&n<eh*60+em; }
+  let html=`<div class="card-title">📅 Clases de hoy</div>`;
+  if(!td){ s.innerHTML=html+`<p style="font-size:13px;color:var(--tx3)">Hoy no es día de semana.</p>`; return; }
+  const lvls=ui.level==='todos'?['basica','media']:[ui.level];
+  const items=[];
+  lvls.forEach(lv=>{
+    getBlocks(lv).forEach((bl,bi)=>{
+      if(bl.isBreak) return;
+      const key=slotKey(dStr(td),lv==='basica'?'b':'m',bi);
+      const bk=data.bookings[key]; if(!bk) return;
+      const tk=data.tickets[key];
+      const stc=tk==='ok'?'var(--green-tx)':tk==='no'?'var(--red-tx)':'var(--amber-tx)';
+      const stl=tk==='ok'?'✓ Asistió':tk==='no'?'✕ No asistió':'⏳ Pendiente';
+      const enCurso=isNowInSlot(bl);
+      items.push(`<div class="status-row ${enCurso?'now-row':''}">
+        <span style="font-size:11px;color:var(--tx3);min-width:72px;font-family:'DM Mono',monospace">${toAmPm(bl.start)}</span>
+        <span class="badge ${lv==='basica'?'bb':'bm'}">${lv==='basica'?'Básica':'Media'}</span>
+        ${enCurso?`<span style="background:#dcfce7;color:#065f46;font-size:10px;font-weight:800;padding:1px 7px;border-radius:20px;animation:pulse 1.5s infinite">🟢 EN CURSO</span>`:''}
+        <span style="font-size:13px;flex:1;margin:0 8px">${esc(bk.course)}${bk.teacher?` <span style="color:var(--tx3)">— ${esc(bk.teacher)}</span>`:''}</span>
+        <span style="font-size:12px;font-weight:700;color:${stc};white-space:nowrap">${stl}</span>
+      </div>`);
+    });
+  });
+  s.innerHTML=html+(items.length?items.join(''):`<p style="font-size:13px;color:var(--tx3)">Sin clases agendadas para hoy.</p>`);
+}
+
+// ══════════════════════════════════════════
+// FIN DE SEMANA
+// ══════════════════════════════════════════
+function weSlotKey(ds, level, bi){
+  return `${ds}__${level==='basica'?'wb':'wm'}${bi}`;
+}
+function getWEBlocks(level){
+  if(level==='basica') return cfg.blocksWEBasica || cfg.blocksBasica;
+  return cfg.blocksWEMedia || cfg.blocksMedia;
+}
+function isPastWESlot(d, bi, level){
+  const bl = getWEBlocks(level)[bi];
+  if(!bl || bl.isBreak) return false;
+  const [h,m] = bl.end.split(':').map(Number);
+  const t = new Date(d); t.setHours(h,m,0,0);
+  return t < new Date();
+}
+
+function renderGridWE(datesWE){
+  const g = document.getElementById('calGridWE'); if(!g) return;
+  const dispLv = ui.weLvl || 'basica';
+  const blocks = getWEBlocks(dispLv);
+  const DAYS_WE2 = ['Sábado','Domingo'];
+  let html = '<div></div>';
+  datesWE.forEach((d,i)=>{
+    const esHoy = isToday(d);
+    html += `<div class="cal-head ${esHoy?'today':''}" style="background:#f5f3ff;border-radius:6px;color:${esHoy?'var(--blue)':'#5b21b6'}">
+      ${DAYS_WE2[i]}<br><b style="font-size:15px">${d.getDate()}</b>
+      <div style="font-size:9px;color:#a78bfa;font-weight:400">${d.toLocaleDateString('es-CL',{month:'short'})}</div>
+    </div>`;
+  });
+  blocks.forEach((bl,bi)=>{
+    if(bl.isBreak){
+      html += `<div class="time-lbl" style="background:#faf5ff"><span style="font-size:8px;color:#7c3aed">${toAmPm(bl.start)}</span></div>`;
+      datesWE.forEach(()=>{ html += `<div class="slot brk" style="background:#ede9fe;border-color:#c4b5fd"><div class="brk-lbl" style="color:#5b21b6">🌿 ${bl.label}</div></div>`; });
+      return;
+    }
+    html += `<div class="time-lbl" style="background:#faf5ff">
+      <span style="font-weight:600;font-size:9px;color:#7c3aed">${toAmPm(bl.start)}</span>
+      <span class="time-end">${toAmPm(bl.end)}</span>
+    </div>`;
+    datesWE.forEach(d=>{
+      const ds  = dStr(d);
+      const k   = weSlotKey(ds, dispLv, bi);
+      const bk  = data.bookings[k];
+      const past= isPastWESlot(d, bi, dispLv);
+      let cls = 'slot';
+      if(bk)        cls += dispLv==='basica'?' sb':' sm';
+      else if(past) cls += ' is-past';
+      else          cls += ' can-click';
+      html += `<div class="${cls}" style="${!bk&&!past?'border-color:#c4b5fd;':''}"`;
+      if(!past&&!bk) html += ` onclick="openWEBook('${ds}',${bi},'${dispLv}')"`;
+      else if(bk)    html += ` onclick="openWEBook('${ds}',${bi},'${dispLv}',true)"`;
+      html += '>';
+      if(bk){
+        html += `<div style="display:flex;align-items:flex-start;gap:2px">
+          <div style="flex:1;overflow:hidden">
+            <div class="slot-course">${esc(bk.course)}</div>
+            <div class="slot-sub">${esc(bk.teacher||'')}</div>
+          </div>
+        </div>
+        <div class="trow">
+          <button class="tbtn tok ${data.tickets[k]==='ok'?'on':''}" onclick="event.stopPropagation();tick('${k}','ok')">✓ Asistió</button>
+          <button class="tbtn tno ${data.tickets[k]==='no'?'on':''}" onclick="event.stopPropagation();tick('${k}','no')">✕ No</button>
+        </div>`;
+      } else if(!past){
+        html += `<div class="slot-plus" style="color:#c4b5fd">+</div>`;
+      }
+      html += '</div>';
+    });
+  });
+  g.innerHTML = html;
+}
+
+function renderWeekendToday(datesWE){
+  const s = document.getElementById('weekendCard'); if(!s) return;
+  const td = datesWE.find(d=>isToday(d));
+  let html = `<div class="card-title" style="color:#5b21b6">📅 Clases de hoy — Fin de Semana</div>`;
+  if(!td){ s.innerHTML=html+`<p style="font-size:13px;color:var(--tx3)">Hoy no es sábado ni domingo.</p>`; return; }
+  const items=[];
+  ['basica','media'].forEach(lv=>{
+    getWEBlocks(lv).forEach((bl,bi)=>{
+      if(bl.isBreak) return;
+      const k = weSlotKey(dStr(td), lv, bi);
+      const bk = data.bookings[k]; if(!bk) return;
+      const tk = data.tickets[k];
+      const stc=tk==='ok'?'var(--green-tx)':tk==='no'?'var(--red-tx)':'var(--amber-tx)';
+      const stl=tk==='ok'?'✓ Asistió':tk==='no'?'✕ No asistió':'⏳ Pendiente';
+      const enCurso=isNowInSlot(bl);
+      items.push(`<div class="status-row ${enCurso?'now-row':''}">
+        <span style="font-size:11px;color:var(--tx3);min-width:72px;font-family:'DM Mono',monospace">${toAmPm(bl.start)}</span>
+        <span class="badge ${lv==='basica'?'bb':'bm'}">${lv==='basica'?'Básica':'Media'}</span>
+        ${enCurso?`<span style="background:#dcfce7;color:#065f46;font-size:10px;font-weight:800;padding:1px 7px;border-radius:20px;animation:pulse 1.5s infinite">🟢 EN CURSO</span>`:''}
+        <span style="font-size:13px;flex:1;margin:0 8px">${esc(bk.course)}${bk.teacher?` <span style="color:var(--tx3)">— ${esc(bk.teacher)}</span>`:''}</span>
+        <span style="font-size:12px;font-weight:700;color:${stc};white-space:nowrap">${stl}</span>
+      </div>`);
+    });
+  });
+  s.innerHTML = html + (items.length?items.join(''):`<p style="font-size:13px;color:var(--tx3)">Sin clases agendadas para hoy.</p>`);
+}
+
+function openWEBook(ds, bi, level, editMode){
+  const k   = weSlotKey(ds, level, bi);
+  const bk  = editMode ? data.bookings[k] : null;
+  ui.pendingWESlot = {ds, bi, level, editMode, editKey:k};
+  ui._saveWE = true;
+  ui.pendingSlot = null;
+  const bl  = getWEBlocks(level)[bi];
+  const modeLabel = editMode?'Editar':'Agendar';
+  document.getElementById('bookTitle').textContent = `${modeLabel} — ${bl.label} (${toAmPm(bl.start)} – ${toAmPm(bl.end)}) 🏖️`;
+  document.getElementById('bCourse').value  = bk?bk.course:'';
+  document.getElementById('bTeacher').value = bk?bk.teacher:'';
+  document.getElementById('bLevel').value   = bk?bk.level:level;
+  document.getElementById('bSaveBtn').textContent = editMode?'Guardar cambios ✓':'Agendar ✓';
+  const delBtn = document.getElementById('bDeleteBtn');
+  if(delBtn) delBtn.style.display = editMode?'':'none';
+  document.getElementById('bookModal').classList.add('open');
+  setTimeout(()=>document.getElementById('bCourse').focus(),100);
+}
+function removeWEBk(k){
+  if(!confirm('¿Eliminar esta reserva de fin de semana?')) return;
+  delete data.bookings[k]; delete data.tickets[k];
+  Object.keys(data.notified).forEach(nk=>{ if(nk.startsWith(k)) delete data.notified[nk]; });
+  saveData(); renderMain(); showToast('Reserva eliminada');
+}
+
+function setLevel(l){ ui.level=l; renderMain(); }
+function changeWeek(d){
+  if(d===0){ ui.weekOffset=0; }
+  else { ui.weekOffset+=d; }
+  renderMain();
+}
+// Keyboard nav: ← → arrows when not focused on input
+document.addEventListener('keydown',function(e){
+  if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.tagName==='SELECT') return;
+  if(e.key==='ArrowLeft'){ changeWeek(-1); }
+  else if(e.key==='ArrowRight'){ changeWeek(1); }
+  else if(e.key==='Home'){ changeWeek(0); }
+});
+
+// ══════════════════════════════════════════
+// BOOKING
+// ══════════════════════════════════════════
+function openBook(ds,bi,level,editMode){
+  const prefix=level==='basica'?'b':'m';
+  const key=slotKey(ds,prefix,bi);
+  const existingBk=editMode?data.bookings[key]:null;
+  ui.pendingSlot={ds,bi,level,editMode,editKey:key};
+  ui._saveWE = false;
+  const bl=getBlocks(level)[bi];
+  const modeLabel=editMode?'Editar':'Agendar';
+  document.getElementById('bookTitle').innerHTML=`${modeLabel} — <span style="font-family:'DM Mono',monospace">${bl.label}</span><br><span style="font-size:12px;font-weight:400;opacity:.7">${toAmPm(bl.start)} → ${toAmPm(bl.end)}</span>`;
+  document.getElementById('bCourse').value=existingBk?existingBk.course:'';
+  document.getElementById('bTeacher').value=existingBk?existingBk.teacher:'';
+  document.getElementById('bLevel').value=existingBk?existingBk.level:level;
+  document.getElementById('bSaveBtn').textContent=editMode?'Guardar cambios ✓':'Agendar ✓';
+  const delBtn=document.getElementById('bDeleteBtn');
+  if(delBtn){ delBtn.style.display=editMode?'':'none'; }
+  document.getElementById('bookModal').classList.add('open');
+  setTimeout(()=>document.getElementById('bCourse').focus(),100);
+}
+function closeBook(){ document.getElementById('bookModal').classList.remove('open'); ui._saveWE=false; }
+function saveBook(){
+  const course=document.getElementById('bCourse').value.trim();
+  if(!course){ showToast('Ingresa el nombre del curso'); return; }
+
+  if(ui._saveWE && ui.pendingWESlot){
+    const {ds,bi,level,editMode,editKey}=ui.pendingWESlot;
+    const newLevel=document.getElementById('bLevel').value;
+    const k=weSlotKey(ds,newLevel,bi);
+    const bl=getWEBlocks(newLevel)[bi]||getWEBlocks(level)[bi];
+    if(editMode && editKey && editKey!==k){
+      delete data.bookings[editKey]; delete data.tickets[editKey];
+      Object.keys(data.notified).forEach(nk=>{ if(nk.startsWith(editKey)) delete data.notified[nk]; });
+    }
+    data.bookings[k]={course,level:newLevel,teacher:document.getElementById('bTeacher').value.trim(),ds,bi,prefix:newLevel==='basica'?'wb':'wm',startTime:bl.start,endTime:bl.end,isWE:true};
+    saveData(); closeBook(); renderMain();
+    showToast(editMode?'✓ Reserva FDS actualizada':'✓ Clase FDS agendada');
+    syncToGAS();
+    setTimeout(checkPendingNotifs, 500);
+    return;
+  }
+
+  const {ds,bi,level,editMode,editKey}=ui.pendingSlot;
+  const newLevel=document.getElementById('bLevel').value;
+  const prefix=newLevel==='basica'?'b':'m';
+  const key=slotKey(ds,prefix,bi);
+  const blk=getBlocks(newLevel)[bi]||getBlocks(level)[bi];
+  if(editMode && editKey && editKey!==key){
+    delete data.bookings[editKey]; delete data.tickets[editKey];
+    Object.keys(data.notified).forEach(nk=>{ if(nk.startsWith(editKey)) delete data.notified[nk]; });
+  }
+  data.bookings[key]={course,level:newLevel,teacher:document.getElementById('bTeacher').value.trim(),ds,bi,prefix,startTime:blk.start,endTime:blk.end};
+  saveData(); closeBook(); renderMain();
+  showToast(editMode?'✓ Reserva actualizada':'✓ Clase agendada');
+  syncToGAS();
+  // Resetear notificaciones para esta reserva nueva
+  if(!editMode){
+    Object.keys(data.notified).forEach(k=>{ if(k.startsWith(slotKey(ds,prefix,bi))) delete data.notified[k]; });
+    saveData();
+  }
+  setTimeout(checkPendingNotifs, 500);
+}
+function deleteFromModal(){
+  if(ui._saveWE && ui.pendingWESlot){
+    const {editKey}=ui.pendingWESlot||{};
+    if(!editKey) return;
+    if(!confirm('¿Eliminar esta reserva?')) return;
+    closeBook();
+    delete data.bookings[editKey]; delete data.tickets[editKey];
+    Object.keys(data.notified).forEach(nk=>{ if(nk.startsWith(editKey)) delete data.notified[nk]; });
+    saveData(); renderMain(); showToast('🗑️ Reserva eliminada');
+    return;
+  }
+  const {editKey}=ui.pendingSlot||{};
+  if(!editKey) return;
+  if(!confirm('¿Eliminar esta reserva?')) return;
+  closeBook();
+  delete data.bookings[editKey]; delete data.tickets[editKey];
+  Object.keys(data.notified).forEach(nk=>{ if(nk.startsWith(editKey)) delete data.notified[nk]; });
+  saveData(); renderMain(); showToast('🗑️ Reserva eliminada');
+}
+function tick(key,val){
+  const newVal = data.tickets[key]===val ? null : val;
+  data.tickets[key] = newVal;
+
+  // — Sincronizar asistencia a TODAS las reservas del mismo curso en la semana visible —
+  const thisBk = data.bookings[key];
+  if(thisBk && thisBk.course){
+    const weekDates  = getWeekDates(ui.weekOffset);
+    const weekendDates = getWeekendDates(ui.weekOffset);
+    const allDates   = [...weekDates, ...weekendDates];
+    allDates.forEach(d => {
+      const ds = dStr(d);
+      const isWEDay = d.getDay()===0 || d.getDay()===6;
+      const bookingsForDay = getAllBookingsForDay(ds, isWEDay);
+      bookingsForDay.forEach(item => {
+        if(item.key !== key && item.bk.course === thisBk.course){
+          data.tickets[item.key] = newVal;
+        }
+      });
+    });
+  }
+
+  saveData();
+  renderMain();
+  showToast(newVal==='ok'?'✓ Asistió (aplicado a todo el curso)':newVal==='no'?'✕ No asistió (aplicado a todo el curso)':'↩️ Ticket removido', 2200);
+}
+
+// ══════════════════════════════════════════
+// CONFIG
+// ══════════════════════════════════════════
+function showCfg(){
+  document.getElementById('mainView').style.display='none';
+  document.getElementById('configView').style.display='';
+  const ab=document.getElementById('appBody'); if(ab) ab.scrollTop=0;
+  renderCfg();
+}
+function backMain(){
+  document.getElementById('configView').style.display='none';
+  document.getElementById('mainView').style.display='';
+  renderMain();
+}
+function renderNotifLog(){
+  const nl=document.getElementById('notifLogPanel'); if(!nl) return;
+  if(!window._notifLog.length){ nl.innerHTML='<div style="color:var(--tx3);font-size:11px;padding:4px 0">Sin actividad aún...</div>'; return; }
+  nl.innerHTML=window._notifLog.slice(0,20).map(l=>`<div class="nl-item nl-${l.type}">[${l.ts}] ${l.msg}</div>`).join('');
+}
+function renderCfg(){
+  const v=document.getElementById('configView');
+  const userEmail = window._currentUser ? window._currentUser.email : (window._guestMode ? '(modo local)' : '');
+  v.innerHTML=`
+    <div class="header" style="position:sticky;top:0;z-index:100;border-radius:var(--r)">
+      <div class="header-title">⚙️ Configuración</div>
+      <div class="hdr-btns">
+        <button class="hdr-btn" onclick="backMain()">← Volver</button>
+      </div>
+    </div>
+
+    <!-- GAS Status Banner -->
+    <div class="gas-banner" id="gasBanner">
+      ☁️ <b>Google Apps Script conectado</b> — Los correos se envían aunque tengas la web cerrada.<br>
+      <span style="font-size:11px;opacity:.8">URL fija: ${FIXED_GAS_URL.slice(0,60)}…</span>
+      <button onclick="testGASConnection()" style="margin-left:auto;background:#059669;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;">🔌 Verificar</button>
+    </div>
+
+    <div class="card">
+      <div class="cfg-title" style="margin-top:0">👤 Cuenta</div>
+      <div style="font-size:13px;color:var(--tx2);margin-bottom:4px">Correo de cuenta: <b>${esc(userEmail||'—')}</b></div>
+    </div>
+    <div class="card">
+      <div class="cfg-title" style="margin-top:0">Establecimiento</div>
+      <div class="fr"><label>Nombre del establecimiento</label><input class="inp" id="c_school" value="${esc(cfg.schoolName)}"/></div>
+      <div class="fr"><label>📧 Correo destino para recordatorios</label>
+        <input class="inp" id="c_email" type="email" value="${esc(cfg.email)}"/>
+        <div style="font-size:11px;color:var(--tx3);margin-top:4px">Los correos de aviso se enviarán a esta dirección.</div>
+      </div>
+      <div class="fr"><label>⏰ Aviso anticipado</label>
+        <select class="inp" id="c_mins">
+          <option value="0" ${cfg.minutes===0?'selected':''}>Solo aviso de 1 min (abrir sala)</option>
+          ${[5,10,15,20,30].map(n=>`<option value="${n}" ${n===cfg.minutes?'selected':''}>${n} minutos antes + 1 min</option>`).join('')}
+        </select>
+        <div style="font-size:11px;color:var(--tx3);margin-top:5px">✉️ Siempre recibirás un correo <b>1 minuto antes</b> para abrir el taller.</div>
+      </div>
+    </div>
+    <div class="cfg-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:12px">
+      <div class="card" style="margin-bottom:0">
+        <div class="cfg-title" style="margin-top:0;color:var(--blue-tx)">📘 Bloques Básica</div>
+        <div class="blocks-hdr"><span>Nombre</span><span>Inicio</span><span>Fin</span><span></span><span></span></div>
+        <div id="c_bb"></div>
+        <button class="add-btn" onclick="addCBlock('basica')">+ Agregar fila</button>
+      </div>
+      <div class="card" style="margin-bottom:0">
+        <div class="cfg-title" style="margin-top:0;color:var(--green-tx)">📗 Bloques Media</div>
+        <div class="blocks-hdr"><span>Nombre</span><span>Inicio</span><span>Fin</span><span></span><span></span></div>
+        <div id="c_bm"></div>
+        <button class="add-btn" onclick="addCBlock('media')">+ Agregar fila</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:12px">
+      <div class="cfg-title" style="margin-top:0;color:#0369a1">📬 Log de notificaciones</div>
+      <div style="font-size:11px;color:var(--tx3);margin-bottom:8px">
+        Historial de envíos en esta sesión — Motor: cheques cada 15s · GAS: cheques cada minuto en servidor
+      </div>
+      <div class="notif-log" id="notifLogPanel"></div>
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-blue" style="padding:7px 14px;font-size:13px" onclick="testEmail()">📧 Correo de prueba</button>
+        <button class="btn-ghost" style="padding:7px 14px;font-size:13px" onclick="triggerGASCheck()">▶️ Forzar chequeo GAS</button>
+        <button class="btn-ghost" style="padding:7px 14px;font-size:13px" onclick="resetNotified()">🔄 Resetear avisos</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:12px">
+      <div class="cfg-title" style="margin-top:0;color:#dc2626">🧪 Simulacro — Probar alertas</div>
+      <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:12px;color:#991b1b;line-height:1.7">
+        Envía una notificación de prueba para verificar que el sistema de correos funciona correctamente.
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+        <div>
+          <label style="font-size:11px;font-weight:600;color:var(--tx3);display:block;margin-bottom:4px">Día</label>
+          <select class="inp-sm" id="sim_day">
+            ${(()=>{
+              const opts=[];
+              for(let i=0;i<7;i++){
+                const d=new Date(); d.setDate(d.getDate()+i);
+                const ds2=dStr(d);
+                const label=i===0?'Hoy':i===1?'Mañana':d.toLocaleDateString('es-CL',{weekday:'short',day:'numeric',month:'short'});
+                opts.push(`<option value="${ds2}">${label}</option>`);
+              }
+              return opts.join('');
+            })()}
+          </select>
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:600;color:var(--tx3);display:block;margin-bottom:4px">Hora de la clase</label>
+          <input class="inp-sm" type="time" id="sim_time" value="${new Date().toTimeString().slice(0,5)}"/>
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:600;color:var(--tx3);display:block;margin-bottom:4px">Aviso (min antes)</label>
+          <select class="inp-sm" id="sim_mins">
+            <option value="1">1 min (abrir sala)</option>
+            <option value="5">5 min antes</option>
+            <option value="10">10 min antes</option>
+            <option value="15" selected>15 min antes</option>
+            <option value="20">20 min antes</option>
+            <option value="30">30 min antes</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn" style="background:#dc2626;color:#fff;padding:8px 18px;font-size:13px" onclick="runSimulacro()">🚨 Enviar simulacro ahora</button>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap">
+      <button class="btn-ghost" onclick="backMain()">Cancelar</button>
+      <button class="btn btn-blue" onclick="saveCfgView()">Guardar ✓</button>
+    </div>`;
+  renderCBlocks('basica'); renderCBlocks('media');
+  renderNotifLog();
+  // Verificar GAS al abrir config
+  setTimeout(testGASConnection, 500);
+}
+function renderCBlocks(lv){
+  const arr=lv==='basica'?cfg.blocksBasica:cfg.blocksMedia;
+  const cid=lv==='basica'?'c_bb':'c_bm';
+  const c=document.getElementById(cid); if(!c) return;
+  const key=lv==='basica'?'blocksBasica':'blocksMedia';
+  c.innerHTML=arr.map((b,i)=>`
+    <div class="block-row ${b.isBreak?'brk-row':''}">
+      <input class="inp-sm" value="${esc(b.label)}" onchange="cfg.${key}[${i}].label=this.value"/>
+      <input class="inp-sm" type="time" value="${b.start}" onchange="cfg.${key}[${i}].start=this.value"/>
+      <input class="inp-sm" type="time" value="${b.end}"   onchange="cfg.${key}[${i}].end=this.value"/>
+      <button class="icon-btn" onclick="toggleCBreak('${lv}',${i})">${b.isBreak?'🌿':'☕'}</button>
+      <button class="del-btn"  onclick="delCBlock('${lv}',${i})">✕</button>
+    </div>`).join('');
+}
+function toggleCBreak(lv,i){ const a=lv==='basica'?cfg.blocksBasica:cfg.blocksMedia; a[i].isBreak=!a[i].isBreak; renderCBlocks(lv); }
+function addCBlock(lv){ const a=lv==='basica'?cfg.blocksBasica:cfg.blocksMedia; const l=a[a.length-1]; a.push({label:`Bloque ${a.length+1}`,start:l?l.end:'08:00',end:'09:00',isBreak:false}); renderCBlocks(lv); }
+function delCBlock(lv,i){ const a=lv==='basica'?cfg.blocksBasica:cfg.blocksMedia; if(a.length<=1){showToast('Mínimo una fila');return;} a.splice(i,1); renderCBlocks(lv); }
+function saveCfgView(){
+  cfg.schoolName=document.getElementById('c_school').value.trim()||cfg.schoolName;
+  cfg.email=document.getElementById('c_email').value.trim()||cfg.email;
+  cfg.minutes=parseInt(document.getElementById('c_mins').value);
+  if(isNaN(cfg.minutes)) cfg.minutes=0;
+  saveCfg(); backMain(); showToast('Configuración guardada ✓');
+  syncToGAS();
+}
+function resetNotified(){
+  data.notified={};
+  saveData();
+  showToast('🔄 Historial de avisos limpiado. Se reenviarán los próximos.');
+  addNotifLog('Historial de avisos reseteado manualmente', 'warn');
+  renderNotifLog();
+}
+
+// ══════════════════════════════════════════
+// ═══════════ SISTEMA DE EMAILS ═══════════
+// ══════════════════════════════════════════
+
+// ── EmailJS: inicialización con callback ──
+function initEmailJS(callback) {
+  function tryInit(attempts) {
+    if(typeof emailjs !== 'undefined') {
+      try {
+        emailjs.init({ publicKey: EJS.publicKey });
+        ejsReady = true;
+        addNotifLog('EmailJS inicializado correctamente', 'ok');
+        if(callback) callback();
+      } catch(e) {
+        addNotifLog(`Error al iniciar EmailJS: ${e.message}`, 'err');
+      }
+    } else if(attempts > 0) {
+      setTimeout(() => tryInit(attempts - 1), 800);
+    } else {
+      addNotifLog('EmailJS no pudo cargar después de varios intentos', 'err');
+      if(callback) callback(); // Igual arrancar el motor
+    }
+  }
+  tryInit(10); // Hasta 8 segundos de espera
+}
+
+// ── GAS: sincronizar todos los bookings al script ──
+function buildGASPayload() {
+  if(!cfg) return null;
+  // Construir lista completa de clases próximas (hoy + mañana + próximos 7 días)
+  const upcoming = [];
+  const now = new Date();
+  for(let dayOffset = 0; dayOffset <= 7; dayOffset++) {
+    const d = new Date(now);
+    d.setDate(now.getDate() + dayOffset);
+    d.setHours(0,0,0,0);
+    const ds = dStr(d);
+    const dayOfWeek = d.getDay();
+    const isWEDay = dayOfWeek === 0 || dayOfWeek === 6;
+    
+    ['basica','media'].forEach(lv => {
+      const blocks = isWEDay ? getWEBlocks(lv) : getBlocks(lv);
+      blocks.forEach((bl, bi) => {
+        if(bl.isBreak) return;
+        const key = isWEDay
+          ? weSlotKey(ds, lv, bi)
+          : slotKey(ds, lv==='basica'?'b':'m', bi);
+        const bk = data.bookings[key];
+        if(!bk) return;
+        upcoming.push({
+          key,
+          ds,
+          course:    bk.course,
+          teacher:   bk.teacher || '',
+          level:     lv,
+          startTime: bl.start,
+          endTime:   bl.end,
+          blockLabel: bl.label,
+          isWE:      isWEDay
+        });
+      });
+    });
+  }
+  return {
+    action:      'updateBookings',
+    bookings:    upcoming,
+    cfg: {
+      schoolName: cfg.schoolName,
+      email:      cfg.email,
+      minutes:    cfg.minutes
+    },
+    notified:    data.notified,
+    timestamp:   Date.now(),
+    // Extra context for GAS to do smart dedup
+    minutesAlert: cfg.minutes || 0
+  };
+}
+
+async function syncToGAS() {
+  if(!GAS_URL || !cfg) return;
+  const payload = buildGASPayload();
+  if(!payload) return;
+  
+  try {
+    // Primero intentar con CORS normal
+    const r = await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if(r.ok) {
+      const d = await r.json();
+      addNotifLog(`☁️ GAS sincronizado: ${payload.bookings.length} clase(s) próximas`, 'ok');
+      return d;
+    }
+  } catch(e) {
+    // CORS error — usar no-cors (sin respuesta pero sí llega)
+    try {
+      await fetch(GAS_URL, {
+        method:  'POST',
+        mode:    'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(payload)
+      });
+      addNotifLog(`☁️ GAS notificado (no-cors, sin confirmación)`, 'warn');
+    } catch(e2) {
+      addNotifLog(`❌ GAS sync error: ${e2.message}`, 'err');
+    }
+  }
+}
+
+async function testGASConnection() {
+  const banner = document.getElementById('gasBanner');
+  if(banner){ banner.className='gas-banner warn'; banner.innerHTML=`⏳ <b>Verificando conexión con GAS…</b>`; }
+  try {
+    const r = await fetch(GAS_URL + (GAS_URL.includes('?')?'&':'?') + '_t=' + Date.now());
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    if(d.ok || d.service || d.status) {
+      if(banner){ banner.className='gas-banner'; banner.innerHTML=`✅ <b>GAS conectado y activo</b> — Emails enviados total: ${d.emailsSentTotal||0} · Último run: ${d.lastRun||'N/A'}<br><span style="font-size:11px;opacity:.8">${FIXED_GAS_URL.slice(0,60)}…</span>`; }
+      addNotifLog(`✅ GAS verificado OK — emails total: ${d.emailsSentTotal||0}`, 'ok');
+      showToast('✅ GAS conectado y funcionando', 4000);
+    } else { throw new Error('Respuesta inesperada'); }
+  } catch(e) {
+    if(banner){ banner.className='gas-banner error'; banner.innerHTML=`⚠️ <b>GAS no responde</b> — Puede ser CORS (normal en algunos entornos). Los correos podrían llegar igual.<br><button onclick="triggerGASCheck()" style="margin-top:6px;background:#dc2626;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer">▶️ Forzar chequeo</button>`; }
+    addNotifLog(`⚠️ GAS ping error (posible CORS): ${e.message}`, 'warn');
+  }
+}
+
+async function triggerGASCheck() {
+  showToast('▶️ Solicitando chequeo al GAS…', 2000);
+  addNotifLog('▶️ Chequeo manual solicitado', 'ok');
+  if(!GAS_URL){ showToast('⚠️ GAS URL no configurada', 3000); return; }
+  const body = JSON.stringify({
+    action: 'checkNow',
+    cfg: { email: cfg?.email, schoolName: cfg?.schoolName, minutes: cfg?.minutes },
+    notified: data.notified
+  });
+  try {
+    const r = await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body
+    });
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    const sent = d.emailsSent || d.sent || 0;
+    showToast(`✅ GAS: ${sent} correo(s) enviado(s)`, 4000);
+    addNotifLog(`▶️ Chequeo GAS: ${sent} emails enviados`, 'ok');
+    renderNotifLog();
+  } catch(e) {
+    // Fallback no-cors — el GAS igual puede recibirlo
+    try {
+      await fetch(GAS_URL, { method:'POST', mode:'no-cors', body });
+      showToast('☁️ Solicitud enviada (sin confirmación CORS)', 3000);
+      addNotifLog('▶️ Chequeo GAS enviado en no-cors', 'warn');
+    } catch(e2){
+      showToast('❌ No se pudo contactar el GAS', 3000);
+      addNotifLog(`❌ GAS no responde: ${e2.message}`, 'err');
+    }
+    renderNotifLog();
+  }
+}
+
+function requestNotifPermission(){
+  if(!('Notification' in window)) return;
+  if(Notification.permission==='default'){
+    Notification.requestPermission().then(p=>{ if(p==='granted') showToast('🔔 Notificaciones del navegador activadas'); });
+  }
+}
+
+// ══════════════════════════════════════════
+// ═══ MOTOR DE NOTIFICACIONES (v2) ══════════
+// ══════════════════════════════════════════
+
+function stopNotifEngine(){
+  if(window._notifInterval){ clearInterval(window._notifInterval); window._notifInterval=null; }
+}
+
+function startNotifEngine(){
+  stopNotifEngine();
+  checkPendingNotifs();
+  window._notifInterval = setInterval(checkPendingNotifs, 15000);
+  addNotifLog('Motor de notificaciones iniciado — cheques cada 15s', 'ok');
+}
+
+// ─────────────────────────────────────────────
+// checkPendingNotifs v2:
+// · Ventana extendida: hasta 15 min DESPUÉS del inicio de clase
+//   (cubre casos donde la web estaba cerrada o la pestaña inactiva)
+// · Deduplicación por curso+horario para no enviar doble cuando
+//   el mismo curso tiene básica Y media al mismo bloque
+// ─────────────────────────────────────────────
+function checkPendingNotifs(){
+  if(!cfg || !cfg.email) return;
+
+  const now = new Date();
+  let changed = false;
+
+  for(let dayOffset = 0; dayOffset <= 1; dayOffset++){
+    const d = new Date(now);
+    d.setDate(now.getDate() + dayOffset);
+    d.setHours(0,0,0,0);
+    const ds = dStr(d);
+    const isWEDay = d.getDay() === 0 || d.getDay() === 6;
+
+    const bookingsForDay = getAllBookingsForDay(ds, isWEDay);
+
+    // Evitar doble envío si el mismo curso aparece en básica y media al mismo horario
+    const sentDedup = new Set();
+
+    bookingsForDay.forEach(item => {
+      const [yr, mo, dy2] = ds.split('-').map(Number);
+      const [h, m] = item.bl.start.split(':').map(Number);
+      const classStart = new Date(yr, mo - 1, dy2, h, m, 0, 0);
+
+      const avisos = [{ mins: 1, suffix: '__1min' }];
+      if(cfg.minutes && cfg.minutes > 1){
+        avisos.push({ mins: cfg.minutes, suffix: `__${cfg.minutes}min` });
+      }
+
+      avisos.forEach(({ mins, suffix }) => {
+        const notifKey = item.key + suffix;
+        if(data.notified[notifKey]) return;
+
+        // Clave de dedup: mismo curso + mismo día + mismo inicio + mismo aviso
+        const deduKey = `${item.bk.course}||${ds}||${item.bl.start}||${suffix}`;
+        if(sentDedup.has(deduKey)){
+          data.notified[notifKey] = 'dedup_' + Date.now();
+          changed = true;
+          return;
+        }
+
+        const sendAt   = new Date(classStart.getTime() - mins * 60000);
+        // Ventana generosa: acepta hasta 15 min después del inicio
+        // (cubre reactivación de pestaña o apertura tardía de la web)
+        const expireAt = new Date(classStart.getTime() + 15 * 60000);
+
+        if(now >= sendAt && now < expireAt){
+          sentDedup.add(deduKey);
+          data.notified[notifKey] = Date.now();
+          changed = true;
+          fireNotif(item, mins, ds);
+          addNotifLog(`🔔 Aviso ${mins}min: ${item.bk.course} @ ${toAmPm(item.bl.start)}`, 'ok');
+        } else if(now >= expireAt){
+          data.notified[notifKey] = 'missed_' + Date.now();
+          changed = true;
+          addNotifLog(`⚠️ Perdido: ${item.bk.course} @ ${toAmPm(item.bl.start)} (ventana expiró)`, 'warn');
+        }
+      });
+    });
+  }
+
+  if(changed) saveData();
+}
+
+// Obtiene todos los bookings para un día específico (semana o fin de semana)
+function getAllBookingsForDay(ds, isWEDay) {
+  const items = [];
+  ['basica','media'].forEach(lv => {
+    const blocks = isWEDay ? getWEBlocks(lv) : getBlocks(lv);
+    if(!blocks) return;
+    blocks.forEach((bl, bi) => {
+      if(bl.isBreak) return;
+      const key = isWEDay
+        ? weSlotKey(ds, lv, bi)
+        : slotKey(ds, lv==='basica'?'b':'m', bi);
+      const bk = data.bookings[key];
+      if(!bk) return;
+      items.push({ key, bk, bl, bi, lv, ds });
+    });
+  });
+  // Ordenar por hora
+  items.sort((a,b) => a.bl.start.localeCompare(b.bl.start));
+  return items;
+}
+
+// Dispara la notificación (browser + email via EmailJS)
+function fireNotif(item, minsAntes, ds) {
+  const lv       = item.lv === 'basica' ? 'Educación Básica' : 'Educación Media';
+  const es1min   = minsAntes === 1;
+  const horario  = `${toAmPm(item.bl.start)} – ${toAmPm(item.bl.end)}`;
+  
+  const asunto = es1min
+    ? `🚨 ¡1 minuto! Abre el Taller — ${item.bk.course}`
+    : `⏰ ${minsAntes} min — Taller de Computación: ${item.bk.course}`;
+  
+  const mensaje = es1min
+    ? `⚠️ ¡Es hora de ABRIR el Taller!\n\nCurso: ${item.bk.course}\nEstablecimiento: ${cfg.schoolName}\nNivel: ${lv}\nHorario: ${horario}\nProfesor: ${item.bk.teacher||'—'}\nFecha: ${ds}\n\n👉 Ve a abrir el laboratorio AHORA.`
+    : `Recordatorio anticipado — faltan ${minsAntes} minutos.\n\nCurso: ${item.bk.course}\nEstablecimiento: ${cfg.schoolName}\nNivel: ${lv}\nHorario: ${horario}\nProfesor: ${item.bk.teacher||'—'}\nFecha: ${ds}\n\n🕐 Prepara todo con anticipación.`;
+
+  // Notificación del navegador
+  if('Notification' in window && Notification.permission === 'granted'){
+    try {
+      new Notification(asunto, {
+        body: `${lv} · ${horario}${item.bk.teacher?' · '+item.bk.teacher:''}`,
+        icon: '🖥️'
+      });
+    } catch(e) { console.warn('[Browser Notif]', e); }
+  }
+
+  // Email via EmailJS
+  sendEmail(item, asunto, mensaje);
+  
+}
+
+function sendEmail(item, asunto, mensaje, retryCount = 0) {
+  if(!cfg || !cfg.email) {
+    addNotifLog('❌ Sin correo configurado', 'err');
+    return;
+  }
+  
+  const lv2 = item.lv === 'basica' ? 'Educación Básica' : 'Educación Media';
+  const params = {
+    // Standard EmailJS fields
+    to_email:    cfg.email,
+    reply_to:    cfg.email,
+    // Template variables (cover common naming conventions)
+    subject:     asunto,
+    curso:       item.bk.course,
+    asunto:      asunto,
+    profesor:    item.bk.teacher || '—',
+    nivel:       lv2,
+    fecha:       item.ds,
+    horario:     `${toAmPm(item.bl.start)} – ${toAmPm(item.bl.end)}`,
+    fecha_hora:  `${item.ds} | ${toAmPm(item.bl.start)} – ${toAmPm(item.bl.end)}`,
+    mensaje,
+    name:        cfg.schoolName,
+    school:      cfg.schoolName,
+    to_name:     cfg.schoolName
+  };
+  
+  if(!ejsReady) {
+    if(retryCount < 5) {
+      addNotifLog(`⏳ EmailJS no listo, reintentando en 3s (intento ${retryCount+1})`, 'warn');
+      setTimeout(() => sendEmail(item, asunto, mensaje, retryCount+1), 3000);
+    } else {
+      addNotifLog('❌ EmailJS no está disponible después de varios intentos', 'err');
+    }
+    return;
+  }
+  
+  emailjs.send(EJS.serviceId, EJS.templateId, params)
+    .then(() => {
+      addNotifLog(`✅ Email enviado: ${item.bk.course} → ${cfg.email}`, 'ok');
+    })
+    .catch(e => {
+      const errMsg = e.status ? `${e.status}: ${e.text}` : JSON.stringify(e);
+      addNotifLog(`❌ Error EmailJS: ${errMsg}`, 'err');
+      if(retryCount < 2) {
+        // Reintentar vía EmailJS
+        setTimeout(() => sendEmail(item, asunto, mensaje, retryCount+1), 5000);
+      } else {
+        // Todos los intentos EmailJS fallaron — usar GAS como fallback
+        addNotifLog('⚠️ EmailJS falló 3 veces, usando GAS como fallback', 'warn');
+        sendNotifViaGAS(item, asunto, mensaje);
+      }
+    });
+}
+
+function sendNotifViaGAS(item, asunto, mensaje){
+  if(!GAS_URL || !cfg) return;
+  const payload = {
+    action: 'sendEmail',
+    to: cfg.email,
+    subject: asunto,
+    body: mensaje,
+    course: item.bk.course,
+    teacher: item.bk.teacher || '—',
+    level: item.lv,
+    startTime: item.bl.start,
+    endTime: item.bl.end,
+    ds: item.ds,
+    schoolName: cfg.schoolName
+  };
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) })
+    .then(r => r.ok ? r.json() : Promise.reject('HTTP ' + r.status))
+    .then(() => addNotifLog(`✅ Email enviado vía GAS (fallback): ${item.bk.course}`, 'ok'))
+    .catch(() => {
+      fetch(GAS_URL, { method:'POST', mode:'no-cors', body: JSON.stringify(payload) }).catch(()=>{});
+      addNotifLog('📧 Email GAS fallback enviado (no-cors)', 'warn');
+    });
+}
+
+// ── TEST DE CORREO ──
+function testEmail(){
+  if(!cfg||!cfg.email){ showToast('Configura tu correo primero'); return; }
+  if(!ejsReady){
+    showToast('⚠️ EmailJS cargando, espera…', 3000);
+    setTimeout(()=>{ if(ejsReady) testEmail(); else showToast('❌ EmailJS no pudo cargar. Revisa la consola.', 4000); }, 2000);
+    return;
+  }
+  const params = {
+    curso:     '✅ PRUEBA — Sistema de notificaciones Taller de Computación',
+    profesor:   cfg.schoolName,
+    fecha:      new Date().toLocaleString('es-CL'),
+    mensaje:    `✅ Correo de prueba desde Taller de Computación.\n\nEstablecimiento: ${cfg.schoolName}\nCorreo configurado: ${cfg.email}\nAviso anticipado: ${cfg.minutes > 0 ? cfg.minutes + ' minutos' : 'Solo 1 min'}\n\nSi recibes este correo, el sistema funciona correctamente.\n\n🖥️ Sistema de Gestión de Laboratorio`,
+    name:       cfg.schoolName,
+    to_email:   cfg.email,
+    reply_to:   cfg.email
+  };
+  showToast('📧 Enviando correo de prueba…', 2500);
+  emailjs.send(EJS.serviceId, EJS.templateId, params)
+    .then(() => {
+      showToast('✅ ¡Correo enviado vía EmailJS! Revisa tu bandeja.', 6000);
+      addNotifLog(`✅ Prueba EmailJS enviada a ${cfg.email}`, 'ok');
+      renderNotifLog();
+    })
+    .catch(e => {
+      const errMsg = e.status ? `${e.status}: ${e.text}` : JSON.stringify(e);
+      addNotifLog(`⚠️ EmailJS falló (${errMsg}), intentando vía GAS…`, 'warn');
+      // Fallback: enviar via GAS
+      sendTestViaGAS();
+    });
+}
+
+function sendTestViaGAS(){
+  if(!GAS_URL || !cfg) return;
+  const payload = {
+    action: 'sendTestEmail',
+    cfg: { email: cfg.email, schoolName: cfg.schoolName, minutes: cfg.minutes }
+  };
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) })
+    .then(r => r.ok ? r.json() : Promise.reject('HTTP ' + r.status))
+    .then(d => {
+      showToast('✅ Correo de prueba enviado vía GAS. Revisa tu bandeja.', 6000);
+      addNotifLog(`✅ Prueba GAS enviada a ${cfg.email}`, 'ok');
+      renderNotifLog();
+    })
+    .catch(() => {
+      // no-cors fallback
+      fetch(GAS_URL, { method:'POST', mode:'no-cors', body: JSON.stringify(payload) }).catch(()=>{});
+      showToast('📧 Solicitud enviada (sin confirmación). Revisa tu bandeja en ~1 min.', 6000);
+      addNotifLog('📧 Prueba enviada en no-cors (sin confirmación)', 'warn');
+      renderNotifLog();
+    });
+}
+
+// ── SIMULACRO ──
+function runSimulacro(){
+  if(!cfg||!cfg.email){ showToast('Configura tu correo primero'); return; }
+  const dayEl  = document.getElementById('sim_day');
+  const timeEl = document.getElementById('sim_time');
+  const minsEl = document.getElementById('sim_mins');
+  if(!dayEl||!timeEl){ showToast('Selecciona día y hora'); return; }
+  const simTime = timeEl.value;
+  if(!simTime){ showToast('Ingresa la hora'); return; }
+  const simMins = parseInt(minsEl.value) || 1;
+  const fakeItem = {
+    key: 'sim_' + Date.now(),
+    bk: { course: '🧪 SIMULACRO DE PRUEBA', teacher: 'Sistema', level: 'basica' },
+    bl: { start: simTime, end: simTime, label: 'Simulacro' },
+    lv: 'basica',
+    ds: dayEl.value || dStr(new Date())
+  };
+  showToast(`🧪 Enviando simulacro (${simMins}min)…`, 3000);
+  addNotifLog(`🧪 Simulacro: ${simTime} — aviso ${simMins}min`, 'ok');
+  fireNotif(fakeItem, simMins, fakeItem.ds);
+}
+
+
+// ══════════════════════════════════════════
+// HELPER: agrupa clases del mismo curso/nivel/hora por día
+// Combina bloques contiguos del mismo curso en un rango de hora
+// Elimina filas duplicadas (mismo curso + mismo bloque exacto)
+// ══════════════════════════════════════════
+function mergeClasesDia(clases){
+  // 1. Deduplicar: si mismo curso+nivel tienen exactamente el mismo start/end (básica Y media al mismo horario), unir en una sola fila
+  const seen = new Map(); // key: course|start|end → primer item
+  const deduped = [];
+  clases.forEach(c => {
+    const k = `${c.bk.course}||${c.bl.start}||${c.bl.end}`;
+    if(!seen.has(k)){
+      seen.set(k, c);
+      deduped.push({...c, _niveles: [c.lv]});
+    } else {
+      // Agregar nivel al item ya existente
+      const existing = deduped.find(x => `${x.bk.course}||${x.bl.start}||${x.bl.end}` === k);
+      if(existing && !existing._niveles.includes(c.lv)) existing._niveles.push(c.lv);
+    }
+  });
+
+  // 2. Agrupar bloques consecutivos del mismo curso en un rango horario
+  const merged = [];
+  deduped.forEach(c => {
+    const last = merged[merged.length - 1];
+    if(last && last.bk.course === c.bk.course && last.bk.teacher === c.bk.teacher){
+      // Extender el rango de hora
+      if(c.bl.start < last._endTime) return; // subsumed, skip
+      last._endTime = c.bl.end;
+      last._niveles = [...new Set([...last._niveles, ...c._niveles])];
+      // ticket: si alguno es 'no', predomina; si alguno es 'ok', ok; sino null
+      if(c.tk === 'no') last.tk = 'no';
+      else if(c.tk === 'ok' && last.tk !== 'no') last.tk = 'ok';
+    } else {
+      merged.push({...c, _startTime: c.bl.start, _endTime: c.bl.end});
+    }
+  });
+  return merged;
+}
+
+// ══════════════════════════════════════════
+// VISTA SEMANA COMPLETA
+// ══════════════════════════════════════════
+function renderSemanaView(dates, datesWE){
+  const s=document.getElementById('semanaView'); if(!s) return;
+  const allDates=[...dates,...(datesWE||[])];
+  const f=dates[0],l=dates[4];
+  const wl=`${f.getDate()}/${f.getMonth()+1} — ${l.getDate()}/${l.getMonth()+1}/${l.getFullYear()}`;
+  const byDay=allDates.map(d=>{
+    const ds=dStr(d);
+    const dayOfWeek=d.getDay();
+    const isWEDay=dayOfWeek===0||dayOfWeek===6;
+    const clases=getAllBookingsForDay(ds, isWEDay).map(item=>({...item, tk: data.tickets[item.key]}));
+    return {d,ds,clases};
+  });
+  const total=byDay.reduce((s,dy)=>s+dy.clases.length,0);
+  const asistio=byDay.flatMap(dy=>dy.clases).filter(c=>c.tk==='ok').length;
+  const noAsis=byDay.flatMap(dy=>dy.clases).filter(c=>c.tk==='no').length;
+  const pend=total-asistio-noAsis;
+
+  let html=`
+    <div class="card" style="padding:10px 12px;margin-bottom:8px">
+      <div class="week-nav">
+        <button onclick="changeWeek(-1)">← Anterior</button>
+        <span style="font-size:14px">${wl}</span>
+        <button onclick="changeWeek(1)">Siguiente →</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px">
+        <div style="background:#eff6ff;border-radius:8px;padding:10px;text-align:center"><div style="font-size:22px;font-weight:800;color:#1a56db">${total}</div><div style="font-size:11px;color:#3b82f6">Total</div></div>
+        <div style="background:#f0fdf4;border-radius:8px;padding:10px;text-align:center"><div style="font-size:22px;font-weight:800;color:#059669">${asistio}</div><div style="font-size:11px;color:#10b981">Asistieron</div></div>
+        <div style="background:#fef2f2;border-radius:8px;padding:10px;text-align:center"><div style="font-size:22px;font-weight:800;color:#dc2626">${noAsis}</div><div style="font-size:11px;color:#f87171">No asistieron</div></div>
+        <div style="background:#fefce8;border-radius:8px;padding:10px;text-align:center"><div style="font-size:22px;font-weight:800;color:#d97706">${pend}</div><div style="font-size:11px;color:#fbbf24">Pendientes</div></div>
+      </div>
+    </div>`;
+
+  if(!total){
+    html+=`<div class="card"><p style="font-size:13px;color:var(--tx3);text-align:center;padding:20px 0">Sin clases agendadas esta semana.</p></div>`;
+  } else {
+    byDay.forEach(({d,clases})=>{
+      if(!clases.length) return;
+      const fd=d.toLocaleDateString('es-CL',{weekday:'long',day:'numeric',month:'long'});
+      const esHoy=isToday(d);
+      const isWE=d.getDay()===0||d.getDay()===6;
+      const headerBg=esHoy?'var(--blue)':isWE?'#7c3aed':'#f9fafb';
+      const headerTxt=esHoy||isWE?'#fff':'var(--tx2)';
+      html+=`<div class="card" style="padding:0;overflow:hidden;margin-bottom:8px">
+        <div style="background:${headerBg};padding:10px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--gray-bd)">
+          <span style="font-size:13px;font-weight:700;color:${headerTxt}">${fd.charAt(0).toUpperCase()+fd.slice(1)}${esHoy?' 🟢':''}</span>
+          <span style="font-size:11px;font-weight:600;color:${esHoy||isWE?'rgba(255,255,255,.7)':'var(--tx3)'}">${clases.length} clase${clases.length>1?'s':''}</span>
+        </div>`;
+      const clasesMerged = mergeClasesDia(clases);
+      clasesMerged.forEach((c,ci)=>{
+        const tk=c.tk;
+        const stc=tk==='ok'?'#059669':tk==='no'?'#dc2626':'#d97706';
+        const stl=tk==='ok'?'✓ Asistió':tk==='no'?'✕ No asistió':'⏳ Pendiente';
+        const stBg=tk==='ok'?'#f0fdf4':tk==='no'?'#fef2f2':'#fefce8';
+        const lvColor = c._niveles&&c._niveles.length>1?'linear-gradient(var(--blue),var(--green))':c.lv==='basica'?'var(--blue)':'var(--green)';
+        const startT = toAmPm(c._startTime||c.bl.start);
+        const endT   = toAmPm(c._endTime||c.bl.end);
+        html+=`<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:${ci<clasesMerged.length-1?'1px solid var(--gray-bd)':'none'};background:#fff">
+          <div style="width:3px;height:40px;border-radius:2px;background:${lvColor};flex-shrink:0"></div>
+          <div style="min-width:72px">
+            <div style="font-size:11px;font-weight:700;font-family:'DM Mono',monospace;color:var(--tx2)">${startT}</div>
+            <div style="font-size:10px;color:var(--tx3)">→ ${endT}</div>
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.bk.course)}</div>
+            ${c.bk.teacher?`<div style="font-size:11px;color:var(--tx3)">Prof. ${esc(c.bk.teacher)}</div>`:''}
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            <div style="background:${stBg};color:${stc};padding:3px 8px;border-radius:20px;font-size:11px;font-weight:700">${stl}</div>
+            <div style="display:flex;gap:4px;margin-top:4px;justify-content:flex-end">
+              <button class="tbtn tok ${tk==='ok'?'on':''}" onclick="tick('${c.key}','ok')" style="height:18px;font-size:9px;padding:0 6px">✓</button>
+              <button class="tbtn tno ${tk==='no'?'on':''}" onclick="tick('${c.key}','no')" style="height:18px;font-size:9px;padding:0 6px">✕</button>
+            </div>
+          </div>
+        </div>`;
+      });
+      html+='</div>';
+    });
+  }
+  s.innerHTML=html;
+}
+
+// ══════════════════════════════════════════
+// NOTAS (MEJORADO)
+// ══════════════════════════════════════════
+let _notesSaveTimer=null;
+const NOTA_COLORS=['#fefce8','#f0fdf4','#eff6ff','#fdf4ff','#fff7ed','#fef2f2'];
+const NOTA_COLOR_NAMES=['Amarillo','Verde','Azul','Violeta','Naranja','Rojo'];
+
+function renderNotas(){
+  const s=document.getElementById('notasView'); if(!s) return;
+  const notesList=Object.entries(data.notes||{}).sort((a,b)=>b[1].updatedAt-a[1].updatedAt);
+  const pinned  = notesList.filter(([,n])=>n.pinned);
+  const unpinned= notesList.filter(([,n])=>!n.pinned);
+  const total=notesList.length;
+  const withBody=notesList.filter(([,n])=>n.body&&n.body.trim()).length;
+
+  const renderGroup=(list,label)=> list.length===0?'':`
+    <div style="font-size:11px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.06em;margin:10px 0 6px;padding:0 2px">${label}</div>
+    <div class="notas-grid">
+      ${list.map(([nid,nota])=>{
+        const color=nota.color||NOTA_COLORS[0];
+        const wordsCount=(nota.body||'').trim().split(/\s+/).filter(Boolean).length;
+        const ts=nota.updatedAt?new Date(nota.updatedAt).toLocaleString('es-CL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'Nueva';
+        return `<div class="nota-card2" id="nota_${nid}" style="background:${color};border-color:${color==='#fefce8'?'#fde047':color==='#f0fdf4'?'#86efac':color==='#eff6ff'?'#93c5fd':color==='#fdf4ff'?'#d8b4fe':color==='#fff7ed'?'#fdba74':'#fca5a5'}">
+          <div class="nota2-toolbar">
+            <button class="nota2-pin ${nota.pinned?'on':''}" onclick="toggleNotaPin('${nid}')" title="${nota.pinned?'Desfijar':'Fijar'}">📌</button>
+            <div class="nota2-colors">
+              ${NOTA_COLORS.map((c,ci)=>`<button class="nota2-color-dot ${nota.color===c||(!nota.color&&ci===0)?'sel':''}" style="background:${c};border-color:${ci===0?'#fde047':ci===1?'#86efac':ci===2?'#93c5fd':ci===3?'#d8b4fe':ci===4?'#fdba74':'#fca5a5'}" onclick="setNotaColor('${nid}','${c}')" title="${NOTA_COLOR_NAMES[ci]}"></button>`).join('')}
+            </div>
+            <button class="nota-del" onclick="deleteNota('${nid}')" title="Eliminar">🗑️</button>
+          </div>
+          <input class="nota-title-inp2" placeholder="Título..." value="${esc(nota.title||'')}" oninput="scheduleNotaSave('${nid}','title',this.value)" style="background:transparent"/>
+          <textarea class="nota-body2" placeholder="Escribe tu nota aquí..." oninput="scheduleNotaSave('${nid}','body',this.value)" style="background:transparent">${esc(nota.body||'')}</textarea>
+          <div class="nota2-footer">
+            <span class="nota2-meta">${ts}</span>
+            <span class="nota2-words">${wordsCount} palabra${wordsCount!==1?'s':''}</span>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+
+  s.innerHTML=`
+    <div class="card" style="padding:12px 14px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <div>
+          <div style="font-size:14px;font-weight:700;color:var(--tx2)">📝 Notas</div>
+          <div style="font-size:11px;color:var(--tx3);margin-top:2px">${total} nota${total!==1?'s':''} · ${withBody} con contenido</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <input id="notaSearch" placeholder="🔍 Buscar..." style="padding:7px 11px;font-size:13px;border:1.5px solid var(--gray-bd);border-radius:var(--rs);background:#fff;color:var(--text);font-family:inherit;width:160px" oninput="filterNotas(this.value)"/>
+          <button class="btn btn-blue" style="padding:7px 14px;font-size:13px;white-space:nowrap" onclick="createNota()">+ Nueva nota</button>
+        </div>
+      </div>
+    </div>
+    <div id="notasListContainer">
+      ${total===0
+        ? `<div class="card" style="text-align:center;padding:40px 20px">
+            <div style="font-size:40px;margin-bottom:10px">📝</div>
+            <div style="font-size:15px;font-weight:600;color:var(--tx2);margin-bottom:6px">Sin notas todavía</div>
+            <div style="font-size:13px;color:var(--tx3);margin-bottom:16px">Crea tu primera nota con el botón de arriba</div>
+            <button class="btn btn-blue" style="padding:9px 20px" onclick="createNota()">+ Crear primera nota</button>
+          </div>`
+        : renderGroup(pinned,'📌 Fijadas') + renderGroup(unpinned, pinned.length?'Otras notas':'Todas las notas')
+      }
+    </div>`;
+}
+
+function filterNotas(q){
+  const s=document.getElementById('notasView'); if(!s) return;
+  if(!q.trim()){ renderNotas(); return; }
+  const low=q.toLowerCase();
+  const filtered=Object.entries(data.notes||{}).filter(([,n])=>
+    (n.title||'').toLowerCase().includes(low)||(n.body||'').toLowerCase().includes(low)
+  ).sort((a,b)=>b[1].updatedAt-a[1].updatedAt);
+  const cont=document.getElementById('notasListContainer'); if(!cont) return;
+  if(!filtered.length){ cont.innerHTML=`<div class="card" style="text-align:center;padding:24px;color:var(--tx3);font-size:13px">Sin resultados para "${esc(q)}"</div>`; return; }
+  cont.innerHTML=`<div class="notas-grid">${filtered.map(([nid,nota])=>{
+    const color=nota.color||NOTA_COLORS[0];
+    return `<div class="nota-card2" style="background:${color}">
+      <input class="nota-title-inp2" style="background:transparent" value="${esc(nota.title||'')}" oninput="scheduleNotaSave('${nid}','title',this.value)" placeholder="Título..."/>
+      <textarea class="nota-body2" style="background:transparent" oninput="scheduleNotaSave('${nid}','body',this.value)">${esc(nota.body||'')}</textarea>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function createNota(){
+  const nid='n_'+Date.now();
+  if(!data.notes) data.notes={};
+  data.notes[nid]={title:'',body:'',color:NOTA_COLORS[0],pinned:false,createdAt:Date.now(),updatedAt:Date.now()};
+  saveData(); renderNotas();
+  setTimeout(()=>{ const ta=document.querySelector(`#nota_${nid} .nota-body2`); if(ta) ta.focus(); },100);
+}
+function toggleNotaPin(nid){
+  if(!data.notes[nid]) return;
+  data.notes[nid].pinned=!data.notes[nid].pinned;
+  data.notes[nid].updatedAt=Date.now();
+  saveData(); renderNotas();
+}
+function setNotaColor(nid,color){
+  if(!data.notes[nid]) return;
+  data.notes[nid].color=color;
+  data.notes[nid].updatedAt=Date.now();
+  saveData(); renderNotas();
+}
+function scheduleNotaSave(nid,field,val){
+  if(!data.notes[nid]) return;
+  data.notes[nid][field]=val; data.notes[nid].updatedAt=Date.now();
+  clearTimeout(_notesSaveTimer);
+  _notesSaveTimer=setTimeout(()=>{ saveData(); },600);
+}
+function deleteNota(nid){
+  if(!confirm('¿Eliminar esta nota?')) return;
+  delete data.notes[nid];
+  saveData(); renderNotas(); showToast('Nota eliminada');
+}
+
+// ══════════════════════════════════════════
+// OT — ÓRDENES DE TRABAJO (Gmail)
+// ══════════════════════════════════════════
+function renderOT(){
+  const s=document.getElementById('otView'); if(!s) return;
+  if(!data.ots) data.ots={};
+  const otList=Object.entries(data.ots).sort((a,b)=>b[1].createdAt-a[1].createdAt);
+  const pending=otList.filter(([,o])=>!o.done).length;
+  const done=otList.filter(([,o])=>o.done).length;
+
+  s.innerHTML=`
+    <div class="card" style="padding:12px 14px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+        <div>
+          <div style="font-size:14px;font-weight:700;color:#6b21a8">🔧 Órdenes de Trabajo</div>
+          <div style="font-size:11px;color:var(--tx3);margin-top:2px">${pending} pendiente${pending!==1?'s':''} · ${done} realizada${done!==1?'s':''}</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn" style="background:#f3e8ff;color:#6b21a8;border:none;padding:7px 12px;font-size:12px;font-weight:700" onclick="fetchGmailOTs()">
+            📧 Sincronizar Gmail
+          </button>
+          <button class="btn" style="background:#6b21a8;color:#fff;border:none;padding:7px 14px;font-size:13px;font-weight:700" onclick="openNewOT()">
+            + Nueva OT
+          </button>
+        </div>
+      </div>
+      <div id="gmailSyncStatus" style="display:none"></div>
+    </div>
+
+    ${otList.length===0
+      ? `<div class="card" style="text-align:center;padding:40px 20px">
+          <div style="font-size:40px;margin-bottom:10px">🔧</div>
+          <div style="font-size:15px;font-weight:600;color:var(--tx2);margin-bottom:6px">Sin órdenes de trabajo</div>
+          <div style="font-size:13px;color:var(--tx3);margin-bottom:16px">Sincroniza tu Gmail para importar emails con código OS+número, o crea una manualmente</div>
+          <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+            <button class="btn" style="background:#f3e8ff;color:#6b21a8;border:none;padding:9px 18px;font-size:13px;font-weight:700" onclick="fetchGmailOTs()">📧 Sincronizar Gmail</button>
+            <button class="btn" style="background:#6b21a8;color:#fff;border:none;padding:9px 18px;font-size:13px;font-weight:700" onclick="openNewOT()">+ Nueva OT manual</button>
+          </div>
+        </div>`
+      : `<div id="otListContainer">
+          ${renderOTList(otList)}
+        </div>`
+    }
+
+    <!-- Modal Nueva OT -->
+    <div id="otModal" class="modal-bg" style="display:none" onclick="if(event.target===this)closeOTModal()">
+      <div class="modal" style="max-width:420px">
+        <h3>🔧 Nueva Orden de Trabajo</h3>
+        <div class="fr"><label>Código OS</label>
+          <input class="inp" id="ot_codigo" placeholder="Ej: OS-1234" style="font-family:'DM Mono',monospace;font-weight:700"/>
+        </div>
+        <div class="fr"><label>Descripción</label>
+          <textarea class="inp" id="ot_desc" placeholder="Descripción del trabajo..." style="min-height:80px;resize:vertical"></textarea>
+        </div>
+        <div class="fr"><label>Prioridad</label>
+          <select class="inp" id="ot_prio">
+            <option value="normal">Normal</option>
+            <option value="alta">Alta</option>
+            <option value="urgente">Urgente</option>
+          </select>
+        </div>
+        <div class="fr"><label>Origen</label>
+          <input class="inp" id="ot_origen" placeholder="Ej: Email, Verbal, Sistema..." value="Manual"/>
+        </div>
+        <div class="btn-row">
+          <button class="btn-ghost" style="flex:1" onclick="closeOTModal()">Cancelar</button>
+          <button class="btn btn-blue" style="flex:1" onclick="saveNewOT()">Crear OT ✓</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderOTList(otList){
+  const pending=otList.filter(([,o])=>!o.done);
+  const done   =otList.filter(([,o])=>o.done);
+  const renderItem=([oid,ot])=>{
+    const prioColor=ot.priority==='urgente'?'#dc2626':ot.priority==='alta'?'#d97706':'#6b7280';
+    const prioBg=ot.priority==='urgente'?'#fee2e2':ot.priority==='alta'?'#fef3c7':'#f3f4f6';
+    const ts=ot.createdAt?new Date(ot.createdAt).toLocaleDateString('es-CL',{day:'numeric',month:'short',year:'numeric'}):'—';
+    const gmailBadge=ot.fromGmail?`<span style="background:#e8f0fe;color:#1a56db;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700">📧 Gmail</span>`:'';
+    return `<div class="ot-item ${ot.done?'ot-done':''}" id="ot_${oid}">
+      <div class="ot-check-col">
+        <label class="ot-check-wrap" title="${ot.done?'Marcar pendiente':'Marcar como realizada'}">
+          <input type="checkbox" class="ot-check" ${ot.done?'checked':''} onchange="toggleOT('${oid}',this.checked)"/>
+          <span class="ot-checkmark"></span>
+        </label>
+      </div>
+      <div class="ot-body">
+        <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:3px">
+          <span class="ot-code">${esc(ot.code||'—')}</span>
+          <span style="background:${prioBg};color:${prioColor};padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700">${ot.priority||'normal'}</span>
+          ${gmailBadge}
+          ${ot.doneAt?`<span style="background:#d1fae5;color:#065f46;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700">✓ ${new Date(ot.doneAt).toLocaleDateString('es-CL',{day:'numeric',month:'short'})}</span>`:''}
+        </div>
+        <div class="ot-desc">${esc(ot.description||'Sin descripción')}</div>
+        ${ot.origen?`<div style="font-size:10px;color:var(--tx3);margin-top:2px">Origen: ${esc(ot.origen)}</div>`:''}
+        <div style="font-size:10px;color:var(--tx3);margin-top:3px">Creada: ${ts}${ot.gmailDate?` · Email: ${esc(ot.gmailDate)}`:''}${ot.gmailFrom?` · De: ${esc(ot.gmailFrom)}`:''}${ot.gmailSubject?`<br><span style="color:#6b7280">Asunto: ${esc(ot.gmailSubject)}</span>`:''}</div>
+      </div>
+      <div class="ot-actions">
+        <button class="ot-del-btn" onclick="deleteOT('${oid}')" title="Eliminar">🗑️</button>
+      </div>
+    </div>`;
+  };
+  let html='';
+  if(pending.length){
+    html+=`<div style="font-size:11px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px">⏳ Pendientes (${pending.length})</div>`;
+    html+=pending.map(renderItem).join('');
+  }
+  if(done.length){
+    html+=`<div style="font-size:11px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.06em;margin:14px 0 8px">✅ Realizadas (${done.length})</div>`;
+    html+=done.map(renderItem).join('');
+  }
+  return html;
+}
+
+function toggleOT(oid, checked){
+  if(!data.ots[oid]) return;
+  data.ots[oid].done=checked;
+  data.ots[oid].doneAt=checked?Date.now():null;
+  saveData();
+  // Re-render solo la lista
+  const cont=document.getElementById('otListContainer');
+  if(cont){
+    const otList=Object.entries(data.ots).sort((a,b)=>b[1].createdAt-a[1].createdAt);
+    cont.innerHTML=renderOTList(otList);
+  } else { renderOT(); }
+  showToast(checked?'✅ OT marcada como realizada':'↩️ OT marcada como pendiente');
+}
+
+function deleteOT(oid){
+  if(!confirm('¿Eliminar esta OT?')) return;
+  delete data.ots[oid];
+  saveData(); renderOT(); showToast('OT eliminada');
+}
+
+function openNewOT(){
+  document.getElementById('otModal').style.display='flex';
+  setTimeout(()=>document.getElementById('ot_codigo').focus(),100);
+}
+function closeOTModal(){ document.getElementById('otModal').style.display='none'; }
+
+function saveNewOT(){
+  const code=document.getElementById('ot_codigo').value.trim();
+  const desc=document.getElementById('ot_desc').value.trim();
+  const prio=document.getElementById('ot_prio').value;
+  const origen=document.getElementById('ot_origen').value.trim()||'Manual';
+  if(!code){ showToast('Ingresa el código OS'); return; }
+  if(!data.ots) data.ots={};
+  const oid='ot_'+Date.now();
+  data.ots[oid]={code,description:desc,priority:prio,origen,done:false,doneAt:null,createdAt:Date.now()};
+  saveData(); closeOTModal(); renderOT();
+  showToast(`✓ OT ${code} creada`);
+}
+
+// ── SINCRONIZACIÓN CON GMAIL via MCP ──
+function fetchGmailOTs(){
+  // La sincronización automática con Gmail no está disponible en esta versión.
+  const statusEl=document.getElementById('gmailSyncStatus');
+  if(statusEl){
+    statusEl.style.display='block';
+    statusEl.innerHTML=`<div style="background:#fefce8;border:1.5px solid #fde047;border-radius:var(--rs);padding:12px 16px;font-size:13px;color:#854d0e;line-height:1.6">
+      ℹ️ <b>Sincronización con Gmail no disponible</b><br>
+      <span style="font-size:12px">Esta función requiere una integración que no está activa. Crea tus OT manualmente con el formulario de abajo.</span>
+    </div>`;
+    setTimeout(()=>{ statusEl.style.display='none'; }, 5000);
+  }
+  showToast('ℹ️ Usa el formulario para crear OT manualmente', 3500);
+}
+// ══════════════════════════════════════════
+// IMPRIMIR
+// ══════════════════════════════════════════
+function printWeek(){
+  const dates=getWeekDates(ui.weekOffset);
+  const f=dates[0],l=dates[4];
+  const wl=`${f.toLocaleDateString('es-CL',{day:'numeric',month:'long'})} — ${l.toLocaleDateString('es-CL',{day:'numeric',month:'long',year:'numeric'})}`;
+  const lvls=['basica','media'];
+  let rows='';
+  dates.forEach(d=>{
+    const ds=dStr(d);
+    const clases=getAllBookingsForDay(ds,false);
+    if(!clases.length) return;
+    const fd=d.toLocaleDateString('es-CL',{weekday:'long',day:'numeric',month:'long'});
+    rows+=`<tr><td colspan="4" style="background:#1a56db;color:#fff;font-weight:700;padding:7px 10px;font-size:13px">${fd.charAt(0).toUpperCase()+fd.slice(1)}</td></tr>`;
+    mergeClasesDia(clases.map(c=>({...c,tk:data.tickets[c.key]}))).forEach(c=>{
+      const tk=c.tk;
+      const stl=tk==='ok'?'✓ Asistió':tk==='no'?'✕ No asistió':'⏳ Pendiente';
+      const stc=tk==='ok'?'#065f46':tk==='no'?'#991b1b':'#92400e';
+      const startT=toAmPm(c._startTime||c.bl.start);
+      const endT  =toAmPm(c._endTime  ||c.bl.end);
+      const nivelTxt = c._niveles&&c._niveles.length>1?'Básica + Media':c.lv==='basica'?'Básica':'Media';
+      const nivelBg  = c._niveles&&c._niveles.length>1?'#e0e7ff':'#eff6ff';
+      const nivelClr = c._niveles&&c._niveles.length>1?'#3730a3':c.lv==='basica'?'#1e3a8a':'#065f46';
+      rows+=`<tr>
+        <td style="padding:6px 10px;font-size:12px;color:#374151;font-family:monospace">${startT}<br><span style="color:#9ca3af;font-size:10px">→ ${endT}</span></td>
+        <td style="padding:6px 10px;font-size:12px"><span style="background:${nivelBg};color:${nivelClr};padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700">${nivelTxt}</span></td>
+        <td style="padding:6px 10px;font-size:13px;font-weight:600">${c.bk.course}${c.bk.teacher?`<br><span style="font-size:11px;font-weight:400;color:#6b7280">Prof. ${c.bk.teacher}</span>`:''}</td>
+        <td style="padding:6px 10px;font-size:11px;font-weight:700;color:${stc}">${stl}</td>
+      </tr>`;
+    });
+  });
+  const win=window.open('','_blank','width=800,height=600');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Horario — ${esc(cfg.schoolName)}</title>
+  <style>*{box-sizing:border-box}body{font-family:system-ui,sans-serif;margin:0;padding:20px;color:#111}
+  h1{font-size:18px;margin:0 0 4px}p{font-size:12px;color:#6b7280;margin:0 0 16px}
+  table{width:100%;border-collapse:collapse}td{border-bottom:1px solid #e5e7eb}
+  @media print{body{padding:10px}.no-print{display:none}}</style></head>
+  <body>
+  <div class="no-print" style="margin-bottom:16px"><button onclick="window.print()" style="background:#1a56db;color:#fff;border:none;border-radius:8px;padding:9px 20px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimir</button></div>
+  <h1>🖥️ ${esc(cfg.schoolName)}</h1>
+  <p>Taller de Computación · Semana: ${wl}</p>
+  <table>${rows||'<tr><td colspan="4" style="padding:20px;color:#9ca3af;text-align:center">Sin clases agendadas esta semana.</td></tr>'}</table>
+  </body></html>`);
+  win.document.close();
+}
+
+// ══════════════════════════════════════════
+// PDF
+// ══════════════════════════════════════════
+function exportPDF(){
+  if(typeof window.jspdf==='undefined'){showToast('Cargando PDF…',1500);setTimeout(exportPDF,1500);return;}
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const dates=getWeekDates(ui.weekOffset);
+  const datesWE=getWeekendDates(ui.weekOffset);
+  const allDates=[...dates,...datesWE];
+  const f=dates[0],l=dates[4];
+  const wl=`${f.getDate()}/${f.getMonth()+1}/${f.getFullYear()} — ${l.getDate()}/${l.getMonth()+1}/${l.getFullYear()}`;
+  const hoy=new Date().toLocaleDateString('es-CL',{day:'numeric',month:'long',year:'numeric'});
+  const W=210;
+  const BLUE=[26,86,219],BLT=[232,240,254],GREEN=[5,150,105],GLT=[209,250,229];
+  const RED=[220,38,38],GRAY=[107,114,128],GLY=[248,249,250],WHT=[255,255,255];
+
+  doc.setFillColor(...BLUE);doc.rect(0,0,W,30,'F');
+  doc.setTextColor(...WHT);doc.setFontSize(15);doc.setFont(undefined,'bold');
+  doc.text('Taller de Computación',14,12);
+  doc.setFontSize(9);doc.setFont(undefined,'normal');
+  doc.text(cfg.schoolName,14,18);
+  doc.setFontSize(8);
+  doc.text(`Semana: ${wl}`,14,24);
+  doc.text(`Generado: ${hoy}`,W-14,24,{align:'right'});
+  let yPos=36;
+
+  const byDay=allDates.map(d=>{
+    const ds=dStr(d);
+    const isWEDay=d.getDay()===0||d.getDay()===6;
+    const clases=getAllBookingsForDay(ds, isWEDay).map(item=>({...item, tk: data.tickets[item.key]}));
+    return {d,ds,clases};
+  });
+
+  const total=byDay.reduce((s,dy)=>s+dy.clases.length,0);
+  const asistio=byDay.flatMap(dy=>dy.clases).filter(c=>c.tk==='ok').length;
+  const noAsis=byDay.flatMap(dy=>dy.clases).filter(c=>c.tk==='no').length;
+  const boxW=(W-28-9)/4;
+  [{label:'Total clases',val:total,c:BLUE,b:BLT},{label:'Asistieron',val:asistio,c:GREEN,b:GLT},
+   {label:'No asistieron',val:noAsis,c:RED,b:[254,226,226]},{label:'Sin confirmar',val:total-asistio-noAsis,c:[180,120,0],b:[254,243,199]}
+  ].forEach((st,i)=>{
+    const x=14+i*(boxW+3);
+    doc.setFillColor(...st.b);doc.setDrawColor(...st.c);
+    doc.roundedRect(x,yPos,boxW,16,2,2,'FD');
+    doc.setTextColor(...st.c);doc.setFontSize(14);doc.setFont(undefined,'bold');
+    doc.text(String(st.val),x+boxW/2,yPos+9,{align:'center'});
+    doc.setFontSize(7);doc.setFont(undefined,'normal');
+    doc.text(st.label,x+boxW/2,yPos+14,{align:'center'});
+  });
+  yPos+=22;
+
+  if(total===0){
+    doc.setTextColor(...GRAY);doc.setFontSize(11);
+    doc.text('No hay reservas esta semana.',14,yPos+10);
+  } else {
+    byDay.forEach(({d,clases})=>{
+      if(!clases.length) return;
+      if(yPos+12+clases.length*20+8>270){ doc.addPage(); yPos=16; }
+      const fecha=d.toLocaleDateString('es-CL',{weekday:'long',day:'numeric',month:'long'});
+      doc.setFillColor(...BLUE);doc.roundedRect(14,yPos,W-28,10,2,2,'F');
+      doc.setTextColor(...WHT);doc.setFontSize(9);doc.setFont(undefined,'bold');
+      doc.text(fecha.charAt(0).toUpperCase()+fecha.slice(1),18,yPos+6.8);
+      doc.setFontSize(8);doc.setFont(undefined,'normal');
+      doc.text(`${clases.length} clase${clases.length>1?'s':''}`,W-18,yPos+6.8,{align:'right'});
+      yPos+=12;
+      mergeClasesDia(clases).forEach((c,ci)=>{
+        const rH=18;
+        const isMultiNivel = c._niveles && c._niveles.length > 1;
+        const barColor = isMultiNivel ? [99,102,241] : (c.lv==='basica'?BLUE:GREEN);
+        const badgeBg  = isMultiNivel ? [224,231,255] : (c.lv==='basica'?BLT:GLT);
+        const badgeTxt = isMultiNivel ? 'Bás+Med' : (c.lv==='basica'?'Básica':'Media');
+        doc.setFillColor(...(ci%2===0?WHT:GLY));doc.rect(14,yPos,W-28,rH,'F');
+        doc.setFillColor(...barColor);doc.rect(14,yPos,3,rH,'F');
+        const tS=toAmPm(c._startTime||c.bl.start), tE=toAmPm(c._endTime||c.bl.end);
+        doc.setTextColor(...barColor);
+        doc.setFontSize(7.5);doc.setFont(undefined,'bold');doc.text(tS,20,yPos+6.5);
+        doc.setFontSize(6.5);doc.setFont(undefined,'normal');doc.text('→ '+tE,20,yPos+12);
+        doc.setFillColor(...badgeBg);doc.roundedRect(40,yPos+3.5,isMultiNivel?20:17,5,1,1,'F');
+        doc.setTextColor(...barColor);doc.setFontSize(6);doc.setFont(undefined,'bold');
+        doc.text(badgeTxt,isMultiNivel?50:48.5,yPos+7.2,{align:'center'});
+        doc.setTextColor(17,24,39);doc.setFontSize(8.5);doc.setFont(undefined,'bold');
+        doc.text((c.bk.course.length>32?c.bk.course.slice(0,30)+'…':c.bk.course),63,yPos+7);
+        if(c.bk.teacher){doc.setTextColor(...GRAY);doc.setFontSize(7);doc.setFont(undefined,'normal');doc.text(`Prof. ${c.bk.teacher}`.slice(0,28),63,yPos+13.5);}
+        let sC,sL,sB;
+        if(c.tk==='ok'){sC=GREEN;sL='✓ Asistió';sB=GLT;}
+        else if(c.tk==='no'){sC=RED;sL='✕ No asistió';sB=[254,226,226];}
+        else{sC=[180,120,0];sL='⏳ Pendiente';sB=[254,243,199];}
+        const sW=28;
+        doc.setFillColor(...sB);doc.roundedRect(W-14-sW-2,yPos+5,sW,7,1.5,1.5,'F');
+        doc.setTextColor(...sC);doc.setFontSize(7);doc.setFont(undefined,'bold');
+        doc.text(sL,W-14-sW/2-2,yPos+9.8,{align:'center'});
+        doc.setDrawColor(229,231,235);doc.setLineWidth(0.2);doc.line(14,yPos+rH,W-14,yPos+rH);
+        yPos+=rH;
+      });
+      yPos+=8;
+    });
+  }
+
+  const pages=doc.internal.getNumberOfPages();
+  for(let i=1;i<=pages;i++){
+    doc.setPage(i);
+    doc.setFillColor(...GLY);doc.rect(0,287,W,10,'F');
+    doc.setTextColor(...GRAY);doc.setFontSize(7);doc.setFont(undefined,'normal');
+    doc.text(`${cfg.schoolName} · Taller de Computación · ${hoy}`,14,293);
+    doc.text(`Página ${i} de ${pages}`,W-14,293,{align:'right'});
+  }
+  doc.save(`Taller_${dStr(f)}_al_${dStr(l)}.pdf`);
+  showToast('📄 PDF guardado');
+}
+
+// ══════════════════════════════════════════
+// EVENTS
+// ══════════════════════════════════════════
+document.getElementById('bookModal').addEventListener('click',function(e){ if(e.target===this) closeBook(); });
+document.getElementById('bCourse').addEventListener('keydown',e=>{ if(e.key==='Enter') saveBook(); });
+document.getElementById('lPass').addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
+document.getElementById('rPass2').addEventListener('keydown',e=>{ if(e.key==='Enter') doRegister(); });
+
+// Reanudar motor al volver a la pestaña
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible' && cfg) {
+    addNotifLog('Pestaña activa — chequeo inmediato', 'ok');
+    // Reiniciar intervalo para mantener precisión de timing
+    stopNotifEngine();
+    startNotifEngine(); // llama checkPendingNotifs() internamente
+  }
+});
+
+// Sincronizar GAS cada 5 minutos mientras la web esté abierta
+setInterval(() => { if(cfg) syncToGAS(); }, 5 * 60 * 1000);
+</script>
+</body>
+</html>
