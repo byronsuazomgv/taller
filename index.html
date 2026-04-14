@@ -91,7 +91,11 @@ window.loadCloudData = async function(uid) {
       if (d2.updatedAt && d2.updatedAt > (window._lastSave || 0)) {
         if (d2.cfg)      window._appCfg = d2.cfg;
         if (d2.bookings) window._appData.bookings = d2.bookings;
-        if (d2.tickets)  window._appData.tickets  = d2.tickets;
+        // Solo sobreescribir tickets si la nube es MÁS reciente que el último cambio local
+        // Esto evita que tickets sincronizados con el bug anterior vuelvan a aparecer
+        if (d2.tickets && d2.updatedAt > (window._lastTicketChange || 0)){
+          window._appData.tickets = d2.tickets;
+        }
         if (d2.notes)    window._appData.notes    = d2.notes;
         if (d2.ots)      window._appData.ots      = d2.ots;
         if (window._appMounted) window._appMounted();
@@ -1500,6 +1504,7 @@ function deleteFromModal(){
 function tick(key,val){
   const newVal = data.tickets[key]===val ? null : val;
   data.tickets[key] = newVal;
+  window._lastTicketChange = Date.now();
   saveData();
   renderMain();
   showToast(newVal==='ok'?'✓ Asistió':newVal==='no'?'✕ No asistió':'↩️ Ticket removido', 1800);
@@ -1586,6 +1591,7 @@ function renderCfg(){
         <button class="btn btn-blue" style="padding:7px 14px;font-size:13px" onclick="testEmail()">📧 Correo de prueba</button>
         <button class="btn-ghost" style="padding:7px 14px;font-size:13px" onclick="triggerGASCheck()">▶️ Forzar chequeo GAS</button>
         <button class="btn-ghost" style="padding:7px 14px;font-size:13px" onclick="resetNotified()">🔄 Resetear avisos</button>
+        <button class="btn-ghost" style="padding:7px 14px;font-size:13px;border-color:#fca5a5;color:#dc2626" onclick="resetTickets()">🗑️ Limpiar tickets de asistencia</button>
       </div>
     </div>
 
@@ -1669,6 +1675,14 @@ function resetNotified(){
   showToast('🔄 Historial de avisos limpiado. Se reenviarán los próximos.');
   addNotifLog('Historial de avisos reseteado manualmente', 'warn');
   renderNotifLog();
+}
+
+function resetTickets(){
+  if(!confirm('¿Limpiar TODOS los tickets de asistencia (✓/✕)? Esto no borra las reservas, solo el estado de asistencia.')) return;
+  data.tickets = {};
+  saveData();
+  renderMain();
+  showToast('🗑️ Tickets de asistencia limpiados.');
 }
 
 // ══════════════════════════════════════════
