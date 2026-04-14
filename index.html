@@ -380,7 +380,7 @@ button,input,select{font-family:inherit;}
 .zoom-btn:hover{background:var(--blue-lt);}
 .zoom-btn:disabled{color:#d1d5db;cursor:default;}
 .zoom-level{font-size:11px;font-weight:700;color:var(--tx3);min-width:34px;text-align:center;font-family:'DM Mono',monospace;}
-.slot{min-height:56px;}
+/* slot height = --slot-h controlled by applyZoom() */
 .slot-course{font-size:10px;}
 .time-lbl{font-size:8px;}
 
@@ -401,7 +401,7 @@ button,input,select{font-family:inherit;}
   .week-nav{flex-wrap:wrap;gap:6px;}
   .week-nav span{font-size:12px;order:-1;width:100%;text-align:center;}
   .sync-badge{display:none;}
-  .slot{min-height:48px;}
+  .slot{min-height:var(--slot-h);}
   .block-row{grid-template-columns:1fr 70px 70px auto auto;}
   .blocks-hdr{grid-template-columns:1fr 70px 70px auto auto;}
   .zoom-controls{margin-left:auto;}
@@ -1762,7 +1762,9 @@ function buildGASPayload() {
       minutes:    cfg.minutes
     },
     notified:    data.notified,
-    timestamp:   Date.now()
+    timestamp:   Date.now(),
+    // Extra context for GAS to do smart dedup
+    minutesAlert: cfg.minutes || 0
   };
 }
 
@@ -1820,24 +1822,35 @@ async function testGASConnection() {
 async function triggerGASCheck() {
   showToast('▶️ Solicitando chequeo al GAS…', 2000);
   addNotifLog('▶️ Chequeo manual solicitado', 'ok');
+  if(!GAS_URL){ showToast('⚠️ GAS URL no configurada', 3000); return; }
+  const body = JSON.stringify({
+    action: 'checkNow',
+    cfg: { email: cfg?.email, schoolName: cfg?.schoolName, minutes: cfg?.minutes },
+    notified: data.notified
+  });
   try {
     const r = await fetch(GAS_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'checkNow', cfg: { email: cfg?.email, schoolName: cfg?.schoolName, minutes: cfg?.minutes } })
+      body
     });
+    if(!r.ok) throw new Error('HTTP ' + r.status);
     const d = await r.json();
-    showToast(`✅ GAS: ${d.emailsSent||0} correo(s) enviado(s)`, 4000);
-    addNotifLog(`▶️ Chequeo GAS completado: ${d.emailsSent||0} emails`, 'ok');
+    const sent = d.emailsSent || d.sent || 0;
+    showToast(`✅ GAS: ${sent} correo(s) enviado(s)`, 4000);
+    addNotifLog(`▶️ Chequeo GAS: ${sent} emails enviados`, 'ok');
     renderNotifLog();
   } catch(e) {
-    // Intentar no-cors
-    fetch(GAS_URL, {
-      method:'POST', mode:'no-cors',
-      body: JSON.stringify({ action:'checkNow' })
-    }).catch(()=>{});
-    showToast('☁️ Solicitud enviada (sin confirmación CORS)', 3000);
-    addNotifLog('▶️ Chequeo enviado en no-cors', 'warn');
+    // Fallback no-cors — el GAS igual puede recibirlo
+    try {
+      await fetch(GAS_URL, { method:'POST', mode:'no-cors', body });
+      showToast('☁️ Solicitud enviada (sin confirmación CORS)', 3000);
+      addNotifLog('▶️ Chequeo GAS enviado en no-cors', 'warn');
+    } catch(e2){
+      showToast('❌ No se pudo contactar el GAS', 3000);
+      addNotifLog(`❌ GAS no responde: ${e2.message}`, 'err');
+    }
+    renderNotifLog();
   }
 }
 
@@ -1849,7 +1862,7 @@ function requestNotifPermission(){
 }
 
 // ══════════════════════════════════════════
-// ═══ MOTOR DE NOTIFICACIONES (CORREGIDO) ══
+// ═══ MOTOR DE NOTIFICACIONES (v2) ══════════
 // ══════════════════════════════════════════
 
 function stopNotifEngine(){
@@ -1858,72 +1871,78 @@ function stopNotifEngine(){
 
 function startNotifEngine(){
   stopNotifEngine();
-  // Checar inmediatamente al cargar
   checkPendingNotifs();
-  // Checar cada 15 segundos para máxima precisión
   window._notifInterval = setInterval(checkPendingNotifs, 15000);
   addNotifLog('Motor de notificaciones iniciado — cheques cada 15s', 'ok');
 }
 
 // ─────────────────────────────────────────────
-// FUNCIÓN PRINCIPAL: chequea TODOS los bookings
-// Incluye tanto semana como fin de semana
+// checkPendingNotifs v2:
+// · Ventana extendida: hasta 15 min DESPUÉS del inicio de clase
+//   (cubre casos donde la web estaba cerrada o la pestaña inactiva)
+// · Deduplicación por curso+horario para no enviar doble cuando
+//   el mismo curso tiene básica Y media al mismo bloque
 // ─────────────────────────────────────────────
 function checkPendingNotifs(){
   if(!cfg || !cfg.email) return;
-  
+
   const now = new Date();
   let changed = false;
-  
-  // Buscar en los próximos 2 días (hoy y mañana) para tener margen
-  for(let dayOffset = 0; dayOffset <= 1; dayOffset++) {
+
+  for(let dayOffset = 0; dayOffset <= 1; dayOffset++){
     const d = new Date(now);
     d.setDate(now.getDate() + dayOffset);
     d.setHours(0,0,0,0);
     const ds = dStr(d);
-    const dayOfWeek = d.getDay();
-    const isWEDay = dayOfWeek === 0 || dayOfWeek === 6;
-    
-    // Obtener todos los bookings para este día
+    const isWEDay = d.getDay() === 0 || d.getDay() === 6;
+
     const bookingsForDay = getAllBookingsForDay(ds, isWEDay);
-    
+
+    // Evitar doble envío si el mismo curso aparece en básica y media al mismo horario
+    const sentDedup = new Set();
+
     bookingsForDay.forEach(item => {
-      // Calcular tiempo exacto de inicio de la clase
       const [yr, mo, dy2] = ds.split('-').map(Number);
       const [h, m] = item.bl.start.split(':').map(Number);
-      const classStart = new Date(yr, mo-1, dy2, h, m, 0, 0);
-      
-      // Definir qué avisos enviar
+      const classStart = new Date(yr, mo - 1, dy2, h, m, 0, 0);
+
       const avisos = [{ mins: 1, suffix: '__1min' }];
-      if(cfg.minutes && cfg.minutes > 1) {
+      if(cfg.minutes && cfg.minutes > 1){
         avisos.push({ mins: cfg.minutes, suffix: `__${cfg.minutes}min` });
       }
-      
+
       avisos.forEach(({ mins, suffix }) => {
         const notifKey = item.key + suffix;
-        
-        // Si ya se notificó, saltar
         if(data.notified[notifKey]) return;
-        
-        const sendAt  = new Date(classStart.getTime() - mins * 60000);
-        const missAt  = classStart; // Si pasa de la hora de inicio, se perdió
-        
-        if(now >= sendAt && now < missAt) {
-          // ¡Ventana de notificación! Enviar ahora
+
+        // Clave de dedup: mismo curso + mismo día + mismo inicio + mismo aviso
+        const deduKey = `${item.bk.course}||${ds}||${item.bl.start}||${suffix}`;
+        if(sentDedup.has(deduKey)){
+          data.notified[notifKey] = 'dedup_' + Date.now();
+          changed = true;
+          return;
+        }
+
+        const sendAt   = new Date(classStart.getTime() - mins * 60000);
+        // Ventana generosa: acepta hasta 15 min después del inicio
+        // (cubre reactivación de pestaña o apertura tardía de la web)
+        const expireAt = new Date(classStart.getTime() + 15 * 60000);
+
+        if(now >= sendAt && now < expireAt){
+          sentDedup.add(deduKey);
           data.notified[notifKey] = Date.now();
           changed = true;
           fireNotif(item, mins, ds);
           addNotifLog(`🔔 Aviso ${mins}min: ${item.bk.course} @ ${toAmPm(item.bl.start)}`, 'ok');
-        } else if(now >= missAt && !data.notified[notifKey]) {
-          // Se perdió la ventana — marcar como perdido
+        } else if(now >= expireAt){
           data.notified[notifKey] = 'missed_' + Date.now();
           changed = true;
-          addNotifLog(`⚠️ Aviso perdido: ${item.bk.course} @ ${toAmPm(item.bl.start)} (ya inició)`, 'warn');
+          addNotifLog(`⚠️ Perdido: ${item.bk.course} @ ${toAmPm(item.bl.start)} (ventana expiró)`, 'warn');
         }
       });
     });
   }
-  
+
   if(changed) saveData();
 }
 
@@ -1975,8 +1994,6 @@ function fireNotif(item, minsAntes, ds) {
   // Email via EmailJS
   sendEmail(item, asunto, mensaje);
   
-  // También notificar al GAS para que lleve su propio registro
-  syncToGAS();
 }
 
 function sendEmail(item, asunto, mensaje, retryCount = 0) {
@@ -1985,14 +2002,24 @@ function sendEmail(item, asunto, mensaje, retryCount = 0) {
     return;
   }
   
+  const lv2 = item.lv === 'basica' ? 'Educación Básica' : 'Educación Media';
   const params = {
-    curso:     asunto,
-    profesor:  item.bk.teacher || cfg.schoolName,
-    fecha:     `${item.ds} | ${toAmPm(item.bl.start)}–${toAmPm(item.bl.end)}`,
+    // Standard EmailJS fields
+    to_email:    cfg.email,
+    reply_to:    cfg.email,
+    // Template variables (cover common naming conventions)
+    subject:     asunto,
+    curso:       item.bk.course,
+    asunto:      asunto,
+    profesor:    item.bk.teacher || '—',
+    nivel:       lv2,
+    fecha:       item.ds,
+    horario:     `${toAmPm(item.bl.start)} – ${toAmPm(item.bl.end)}`,
+    fecha_hora:  `${item.ds} | ${toAmPm(item.bl.start)} – ${toAmPm(item.bl.end)}`,
     mensaje,
-    name:      cfg.schoolName,
-    to_email:  cfg.email,
-    reply_to:  cfg.email
+    name:        cfg.schoolName,
+    school:      cfg.schoolName,
+    to_name:     cfg.schoolName
   };
   
   if(!ejsReady) {
@@ -2011,11 +2038,39 @@ function sendEmail(item, asunto, mensaje, retryCount = 0) {
     })
     .catch(e => {
       const errMsg = e.status ? `${e.status}: ${e.text}` : JSON.stringify(e);
-      addNotifLog(`❌ Error email: ${errMsg}`, 'err');
-      // Reintentar 1 vez
+      addNotifLog(`❌ Error EmailJS: ${errMsg}`, 'err');
       if(retryCount < 2) {
+        // Reintentar vía EmailJS
         setTimeout(() => sendEmail(item, asunto, mensaje, retryCount+1), 5000);
+      } else {
+        // Todos los intentos EmailJS fallaron — usar GAS como fallback
+        addNotifLog('⚠️ EmailJS falló 3 veces, usando GAS como fallback', 'warn');
+        sendNotifViaGAS(item, asunto, mensaje);
       }
+    });
+}
+
+function sendNotifViaGAS(item, asunto, mensaje){
+  if(!GAS_URL || !cfg) return;
+  const payload = {
+    action: 'sendEmail',
+    to: cfg.email,
+    subject: asunto,
+    body: mensaje,
+    course: item.bk.course,
+    teacher: item.bk.teacher || '—',
+    level: item.lv,
+    startTime: item.bl.start,
+    endTime: item.bl.end,
+    ds: item.ds,
+    schoolName: cfg.schoolName
+  };
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) })
+    .then(r => r.ok ? r.json() : Promise.reject('HTTP ' + r.status))
+    .then(() => addNotifLog(`✅ Email enviado vía GAS (fallback): ${item.bk.course}`, 'ok'))
+    .catch(() => {
+      fetch(GAS_URL, { method:'POST', mode:'no-cors', body: JSON.stringify(payload) }).catch(()=>{});
+      addNotifLog('📧 Email GAS fallback enviado (no-cors)', 'warn');
     });
 }
 
@@ -2027,7 +2082,6 @@ function testEmail(){
     setTimeout(()=>{ if(ejsReady) testEmail(); else showToast('❌ EmailJS no pudo cargar. Revisa la consola.', 4000); }, 2000);
     return;
   }
-  showToast('📧 Enviando correo de prueba…', 2000);
   const params = {
     curso:     '✅ PRUEBA — Sistema de notificaciones Taller de Computación',
     profesor:   cfg.schoolName,
@@ -2037,16 +2091,39 @@ function testEmail(){
     to_email:   cfg.email,
     reply_to:   cfg.email
   };
+  showToast('📧 Enviando correo de prueba…', 2500);
   emailjs.send(EJS.serviceId, EJS.templateId, params)
     .then(() => {
-      showToast('✅ ¡Correo enviado! Revisa tu bandeja.', 5000);
-      addNotifLog(`✅ Prueba enviada a ${cfg.email}`, 'ok');
+      showToast('✅ ¡Correo enviado vía EmailJS! Revisa tu bandeja.', 6000);
+      addNotifLog(`✅ Prueba EmailJS enviada a ${cfg.email}`, 'ok');
       renderNotifLog();
     })
     .catch(e => {
       const errMsg = e.status ? `${e.status}: ${e.text}` : JSON.stringify(e);
-      showToast(`❌ Error: ${errMsg}`, 6000);
-      addNotifLog(`❌ Error en prueba: ${errMsg}`, 'err');
+      addNotifLog(`⚠️ EmailJS falló (${errMsg}), intentando vía GAS…`, 'warn');
+      // Fallback: enviar via GAS
+      sendTestViaGAS();
+    });
+}
+
+function sendTestViaGAS(){
+  if(!GAS_URL || !cfg) return;
+  const payload = {
+    action: 'sendTestEmail',
+    cfg: { email: cfg.email, schoolName: cfg.schoolName, minutes: cfg.minutes }
+  };
+  fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) })
+    .then(r => r.ok ? r.json() : Promise.reject('HTTP ' + r.status))
+    .then(d => {
+      showToast('✅ Correo de prueba enviado vía GAS. Revisa tu bandeja.', 6000);
+      addNotifLog(`✅ Prueba GAS enviada a ${cfg.email}`, 'ok');
+      renderNotifLog();
+    })
+    .catch(() => {
+      // no-cors fallback
+      fetch(GAS_URL, { method:'POST', mode:'no-cors', body: JSON.stringify(payload) }).catch(()=>{});
+      showToast('📧 Solicitud enviada (sin confirmación). Revisa tu bandeja en ~1 min.', 6000);
+      addNotifLog('📧 Prueba enviada en no-cors (sin confirmación)', 'warn');
       renderNotifLog();
     });
 }
@@ -2650,10 +2727,9 @@ document.getElementById('rPass2').addEventListener('keydown',e=>{ if(e.key==='En
 document.addEventListener('visibilitychange', () => {
   if(document.visibilityState === 'visible' && cfg) {
     addNotifLog('Pestaña activa — chequeo inmediato', 'ok');
-    checkPendingNotifs();
-    // Reiniciar intervalo para mantener precisión
+    // Reiniciar intervalo para mantener precisión de timing
     stopNotifEngine();
-    startNotifEngine();
+    startNotifEngine(); // llama checkPendingNotifs() internamente
   }
 });
 
