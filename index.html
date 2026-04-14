@@ -61,6 +61,7 @@ window.saveToCloud = async function(uid) {
       bookingsMedia,
       tickets:         window._appData.tickets  || {},
       notified:        window._appData.notified || {},
+      ots:             window._appData.ots      || {},
       notes:           window._appData.notes    || {},
       userEmail,
       userName:        user ? (user.displayName || '') : '',
@@ -81,6 +82,7 @@ window.loadCloudData = async function(uid) {
       if (d.tickets)  { window._appData.tickets  = d.tickets;  LSS('tickets',  d.tickets);  }
       if (d.notified) { window._appData.notified = d.notified; LSS('notified', d.notified); }
       if (d.notes)    { window._appData.notes    = d.notes;    LSS('notes',    d.notes);    }
+      if (d.ots)      { window._appData.ots      = d.ots;      LSS('ots',      d.ots);      }
     }
     if (window._unsubSync) window._unsubSync();
     window._unsubSync = onSnapshot(ref, (snap2) => {
@@ -91,6 +93,7 @@ window.loadCloudData = async function(uid) {
         if (d2.bookings) window._appData.bookings = d2.bookings;
         if (d2.tickets)  window._appData.tickets  = d2.tickets;
         if (d2.notes)    window._appData.notes    = d2.notes;
+        if (d2.ots)      window._appData.ots      = d2.ots;
         if (window._appMounted) window._appMounted();
       }
     });
@@ -124,6 +127,7 @@ if (fbAuth) {
   --bg:#eef1f7;--card:#fff;
   --r:12px;--rs:7px;
   --sh:0 1px 4px rgba(0,0,0,.08);--shm:0 6px 20px rgba(0,0,0,.13);
+  --slot-h:62px;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 body{font-family:'DM Sans',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:15px;}
@@ -229,7 +233,8 @@ button,input,select{font-family:inherit;}
 .cal-head.today{color:var(--blue);}
 .time-lbl{font-size:9px;color:var(--tx3);text-align:right;padding-right:5px;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;line-height:1.5;font-family:'DM Mono',monospace;}
 .time-end{font-size:8px;color:var(--slot-tx);}
-.slot{min-height:62px;border:1.5px solid var(--slot-bd);border-radius:var(--rs);display:flex;flex-direction:column;padding:4px 5px;background:var(--slot);transition:border-color .1s,background .1s;}
+.slot{min-height:var(--slot-h);border:1.5px solid var(--slot-bd);border-radius:var(--rs);display:flex;flex-direction:column;padding:4px 5px;background:var(--slot);transition:border-color .1s,background .1s,min-height .15s;}
+.span-badge{font-size:9px;font-weight:700;background:rgba(0,0,0,.08);color:inherit;border-radius:4px;padding:1px 5px;margin-bottom:3px;align-self:flex-start;}
 .slot.can-click{cursor:pointer;}
 .slot.can-click:hover{border-color:#93c5fd;background:#f0f7ff;}
 .slot.sb{background:var(--blue-lt);border-color:#93c5fd;}
@@ -285,6 +290,8 @@ button,input,select{font-family:inherit;}
 .cfg-title{font-size:13px;font-weight:700;color:var(--tx2);margin:16px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--gray-bd);}
 .blocks-hdr{display:grid;grid-template-columns:1fr 82px 82px auto auto;gap:5px;margin-bottom:6px;}
 .blocks-hdr span{font-size:11px;color:var(--tx3);font-weight:600;}
+.now-row{background:linear-gradient(90deg,#f0fdf4,#fff);border-left:3px solid #059669 !important;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1f2937;color:#fff;padding:10px 22px;border-radius:30px;font-size:13px;font-weight:500;z-index:1000;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;}
 .toast.show{opacity:1;}
 .notif-banner{background:var(--amber-lt);border:1px solid #fcd34d;border-radius:var(--rs);padding:10px 14px;font-size:13px;color:var(--amber-tx);margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
@@ -309,17 +316,53 @@ button,input,select{font-family:inherit;}
 
 /* ─── NOTES ─── */
 .tab.an{background:#fef9c3;border-color:#fde047;color:#854d0e;}
-.nota-card{background:#fff;border:1.5px solid var(--gray-bd);border-radius:var(--r);padding:0;margin-bottom:10px;overflow:hidden;transition:box-shadow .15s;}
-.nota-card:focus-within{box-shadow:0 0 0 2px #93c5fd;border-color:#3b82f6;}
-.nota-header{display:flex;align-items:center;gap:8px;padding:10px 12px 6px;border-bottom:1px solid var(--gray-bd);}
-.nota-title-inp{flex:1;border:none;outline:none;font-size:14px;font-weight:600;color:var(--text);background:transparent;font-family:inherit;}
-.nota-title-inp::placeholder{color:#d1d5db;}
-.nota-del{background:none;border:none;cursor:pointer;color:#d1d5db;font-size:15px;padding:2px 4px;transition:color .1s;}
+.tab.aot{background:#fdf4ff;border-color:#d8b4fe;color:#6b21a8;}
+.notas-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-bottom:10px;}
+.nota-card2{border:1.5px solid #fde047;border-radius:var(--r);padding:0;overflow:hidden;transition:box-shadow .15s,transform .1s;display:flex;flex-direction:column;}
+.nota-card2:focus-within{box-shadow:0 4px 16px rgba(0,0,0,.12);transform:translateY(-1px);}
+.nota2-toolbar{display:flex;align-items:center;gap:6px;padding:7px 10px 5px;border-bottom:1px solid rgba(0,0,0,.06);}
+.nota2-pin{background:none;border:none;cursor:pointer;font-size:14px;padding:2px 3px;opacity:.35;transition:opacity .15s,transform .1s;}
+.nota2-pin:hover,.nota2-pin.on{opacity:1;}
+.nota2-pin.on{transform:rotate(-30deg);}
+.nota2-colors{display:flex;gap:4px;flex:1;}
+.nota2-color-dot{width:14px;height:14px;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0;transition:transform .1s;flex-shrink:0;}
+.nota2-color-dot:hover,.nota2-color-dot.sel{transform:scale(1.3);border-width:2px;}
+.nota-del{background:none;border:none;cursor:pointer;color:#d1d5db;font-size:14px;padding:2px 4px;transition:color .1s;}
 .nota-del:hover{color:var(--red);}
-.nota-body{width:100%;min-height:100px;padding:10px 12px;border:none;outline:none;font-size:13px;color:var(--tx2);resize:vertical;font-family:inherit;line-height:1.6;background:#fefce8;}
-.nota-body:focus{background:#fffbeb;}
-.nota-meta{padding:5px 12px;font-size:10px;color:#d1d5db;text-align:right;background:#fefce8;}
+.nota-title-inp2{width:100%;padding:9px 12px 4px;border:none;outline:none;font-size:14px;font-weight:700;color:var(--text);background:transparent;font-family:inherit;}
+.nota-title-inp2::placeholder{color:rgba(0,0,0,.25);}
+.nota-body2{width:100%;min-height:120px;padding:4px 12px 8px;border:none;outline:none;font-size:13px;color:var(--tx2);resize:vertical;font-family:inherit;line-height:1.65;background:transparent;flex:1;}
+.nota-body2::placeholder{color:rgba(0,0,0,.25);}
+.nota2-footer{display:flex;align-items:center;justify-content:space-between;padding:5px 12px 7px;border-top:1px solid rgba(0,0,0,.06);}
+.nota2-meta{font-size:10px;color:rgba(0,0,0,.35);}
+.nota2-words{font-size:10px;color:rgba(0,0,0,.3);}
+/* ─── OT ─── */
+.ot-item{background:#fff;border:1.5px solid var(--gray-bd);border-radius:var(--rs);padding:12px 12px 12px 10px;margin-bottom:8px;display:flex;align-items:flex-start;gap:10px;transition:opacity .2s;}
+.ot-item.ot-done{opacity:.55;background:#f9fafb;}
+.ot-check-col{flex-shrink:0;padding-top:2px;}
+.ot-check-wrap{display:inline-flex;cursor:pointer;}
+.ot-check{display:none;}
+.ot-checkmark{width:22px;height:22px;border:2px solid #d1d5db;border-radius:6px;display:flex;align-items:center;justify-content:center;transition:all .15s;background:#fff;}
+.ot-check:checked+.ot-checkmark{background:#059669;border-color:#059669;}
+.ot-check:checked+.ot-checkmark::after{content:'✓';color:#fff;font-size:13px;font-weight:700;}
+.ot-body{flex:1;min-width:0;}
+.ot-code{font-size:13px;font-weight:800;color:#6b21a8;font-family:'DM Mono',monospace;background:#f3e8ff;padding:2px 8px;border-radius:6px;}
+.ot-item.ot-done .ot-code{text-decoration:line-through;color:#9ca3af;background:#f3f4f6;}
+.ot-desc{font-size:13px;color:var(--tx2);margin-top:4px;line-height:1.5;}
+.ot-item.ot-done .ot-desc{color:var(--tx3);}
+.ot-actions{flex-shrink:0;}
+.ot-del-btn{background:none;border:none;cursor:pointer;color:#d1d5db;font-size:14px;padding:2px 4px;transition:color .1s;}
+.ot-del-btn:hover{color:var(--red);}
+@keyframes spin{to{transform:rotate(360deg)}}
 
+/* ─── STATS STRIP ─── */
+.stats-strip{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 8px;padding:0 1px;}
+.stat-pill{display:flex;align-items:center;gap:5px;padding:5px 11px;border-radius:20px;font-size:12px;font-weight:600;cursor:default;}
+.stat-pill span{font-size:15px;font-weight:800;}
+.sp-tot{background:#eff6ff;color:#1e3a8a;}
+.sp-ok{background:#f0fdf4;color:#065f46;}
+.sp-no{background:#fef2f2;color:#991b1b;}
+.sp-pend{background:#fefce8;color:#854d0e;}
 /* ─── RESPONSIVE LAYOUT ─── */
 .app{
   max-width:1100px;margin:0 auto;padding:10px;
@@ -470,7 +513,7 @@ button,input,select{font-family:inherit;}
     <div class="modal">
       <h3 id="bookTitle">Agendar clase</h3>
       <div class="fr"><label>Curso / Asignatura</label>
-        <input class="inp" id="bCourse" placeholder="Ej: 5°A — Tecnología"/>
+        <input class="inp" id="bCourse" placeholder="Ej: 5°A — Tecnología" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"/>
       </div>
       <div class="fr"><label>Nivel</label>
         <select class="inp" id="bLevel">
@@ -509,7 +552,7 @@ const EJS = {
 // GLOBALS
 // ══════════════════════════════════════════
 window._appCfg  = null;
-window._appData = { bookings:{}, tickets:{}, notified:{}, notes:{} };
+window._appData = { bookings:{}, tickets:{}, notified:{}, notes:{}, ots:{} };
 window._currentUser = null;
 window._lastSave    = 0;
 window._guestMode   = false;
@@ -571,31 +614,24 @@ let ejsReady = false;
 // GAS_URL: siempre usa la URL fija, ignora localStorage para no haber conflictos
 let GAS_URL = FIXED_GAS_URL;
 
-// Zoom levels
-const ZOOM_SCALES=[0.6, 0.78, 1.0, 1.25, 1.55];
+// Zoom levels — alturas de slot en px (zoom vertical puro)
+const ZOOM_HEIGHTS = [38, 50, 62, 78, 96];
 
 function applyZoom(){
-  const scale = ZOOM_SCALES[ui.calZoom - 1];
+  const slotH = ZOOM_HEIGHTS[ui.calZoom - 1];
+  document.documentElement.style.setProperty('--slot-h', slotH + 'px');
   ['calGridWrap','calGridWEWrap'].forEach(id => {
     const inner = document.getElementById(id);
     if(!inner) return;
-    const outer = inner.parentElement;
-    if(!outer) return;
     inner.style.transform = '';
     inner.style.width = '';
     inner.style.height = '';
-    const naturalW = inner.scrollWidth;
-    const naturalH = inner.scrollHeight;
-    inner.style.transform = `scale(${scale})`;
-    inner.style.transformOrigin = 'top left';
-    inner.style.width  = `${naturalW}px`;
-    inner.style.height = `${Math.ceil(naturalH * scale)}px`;
-    outer.style.height = `${Math.ceil(naturalH * scale)}px`;
-    const scaledW = naturalW * scale;
-    outer.style.overflowX = scaledW > outer.clientWidth ? 'auto' : 'hidden';
+    const outer = inner.parentElement;
+    if(outer){ outer.style.height = ''; outer.style.overflowX = 'auto'; }
   });
+  const pct = Math.round((slotH / 62) * 100);
   document.querySelectorAll('.zoom-level').forEach(el => {
-    el.textContent = `${Math.round(scale * 100)}%`;
+    el.textContent = `${pct}%`;
   });
   document.querySelectorAll('.zoom-btn[data-dir="in"]').forEach(b  => b.disabled = ui.calZoom >= 5);
   document.querySelectorAll('.zoom-btn[data-dir="out"]').forEach(b => b.disabled = ui.calZoom <= 1);
@@ -637,16 +673,20 @@ window.addEventListener('load', initPinch);
 
 function loadAll(){
   try{ cfg=window._appCfg||JSON.parse(LS('cfg')); window._appCfg=cfg; }catch(e){ cfg=null; }
+  // Asegurar correo por defecto si no está configurado
+  if(cfg && !cfg.email){ cfg.email='byron.suazo@colegiomariagriseldavalle.cl'; }
   try{ data.bookings=window._appData.bookings||JSON.parse(LS('bookings')||'{}'); }catch(e){}
   try{ data.tickets =window._appData.tickets ||JSON.parse(LS('tickets') ||'{}'); }catch(e){}
   try{ data.notified=window._appData.notified||JSON.parse(LS('notified')||'{}'); }catch(e){}
   try{ data.notes   =window._appData.notes   ||JSON.parse(LS('notes')   ||'{}'); }catch(e){}
+  try{ data.ots     =window._appData.ots     ||JSON.parse(LS('ots')     ||'{}'); }catch(e){}
 }
 function saveData(){
   LSS('bookings',data.bookings);
   LSS('tickets', data.tickets);
   LSS('notified',data.notified);
   LSS('notes',data.notes);
+  LSS('ots',data.ots);
   cloudSave();
 }
 function saveCfg(){ window._appCfg=cfg; LSS('cfg',cfg); cloudSave(); }
@@ -859,7 +899,7 @@ function duplicateBook(key,ds,bi,level){
 // SETUP
 // ══════════════════════════════════════════
 let ss=0;
-let sd={ schoolName:'',email:'',minutes:15,
+let sd={ schoolName:'',email:'byron.suazo@colegiomariagriseldavalle.cl',minutes:15,
   blocksBasica:JSON.parse(JSON.stringify(DEF_B)),
   blocksMedia: JSON.parse(JSON.stringify(DEF_M)) };
 
@@ -983,6 +1023,7 @@ function renderMain(){
           ${gasOk?'☁️ GAS Activo':'⚠️ Sin GAS'}
         </span>
         <button class="hdr-btn" onclick="exportPDF()">📄 PDF</button>
+        <button class="hdr-btn" onclick="printWeek()" title="Imprimir semana">🖨️</button>
         <div class="user-menu" id="userMenu">
           <div class="user-chip" onclick="toggleUD()">
             <div class="user-av">${getUserInitials()}</div>
@@ -1000,14 +1041,36 @@ function renderMain(){
       </div>
     </div>
     ${needPerm?`<div class="notif-banner" style="margin:0 0 8px;position:sticky;top:60px;z-index:39">🔔 Activa las notificaciones del navegador <button onclick="requestNotifPermission()">Activar</button></div>`:''}
+    ${(()=>{
+      const dates2=getWeekDates(ui.weekOffset);
+      const allD=[...dates2,...getWeekendDates(ui.weekOffset)];
+      let tot=0,ok=0,no=0;
+      allD.forEach(d=>{
+        const ds=dStr(d),isWE=d.getDay()===0||d.getDay()===6;
+        getAllBookingsForDay(ds,isWE).forEach(item=>{
+          tot++;
+          if(data.tickets[item.key]==='ok') ok++;
+          else if(data.tickets[item.key]==='no') no++;
+        });
+      });
+      const pend=tot-ok-no;
+      if(!tot) return '';
+      return `<div class="stats-strip">
+        <div class="stat-pill sp-tot"><span>${tot}</span> clase${tot!==1?'s':''}</div>
+        <div class="stat-pill sp-ok"><span>${ok}</span> asistió</div>
+        <div class="stat-pill sp-no"><span>${no}</span> no asistió</div>
+        <div class="stat-pill sp-pend"><span>${pend}</span> pendiente${pend!==1?'s':''}</div>
+      </div>`;
+    })()}
     <div class="tab-bar" style="position:sticky;top:62px;z-index:40;background:var(--bg);padding:4px 0;margin:0 0 8px">
       <div class="tab ${ui.level==='basica'?'ab':''}" onclick="setLevel('basica')">📘 Básica</div>
       <div class="tab ${ui.level==='media'?'am':''}"  onclick="setLevel('media')">📗 Media</div>
       <div class="tab ${ui.level==='todos'?'at':''}"  onclick="setLevel('todos')">📋 Semana</div>
       <div class="tab ${ui.level==='notas'?'an':''}"  onclick="setLevel('notas')">📝 Notas</div>
+      <div class="tab ${ui.level==='ot'?'aot':''}"    onclick="setLevel('ot')">🔧 OT</div>
     </div>
 
-    ${ui.level==='notas'?`<div id="notasView"></div>`:ui.level==='todos'?`<div id="semanaView"></div>`:`
+    ${ui.level==='notas'?`<div id="notasView"></div>`:ui.level==='todos'?`<div id="semanaView"></div>`:ui.level==='ot'?`<div id="otView"></div>`:`
 
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
       <div style="flex:1;height:2px;background:linear-gradient(90deg,var(--blue),transparent)"></div>
@@ -1023,12 +1086,13 @@ function renderMain(){
     </div>
     <div class="card" style="padding:10px 12px">
       <div class="week-nav">
-        <button onclick="changeWeek(-1)">← Anterior</button>
+        <button onclick="changeWeek(-1)" title="Semana anterior (←)">← Anterior</button>
         <span>${wl}</span>
-        <button onclick="changeWeek(1)">Siguiente →</button>
+        <button onclick="changeWeek(0)" title="Ir a semana actual" style="font-size:11px;padding:5px 10px;background:var(--blue-lt);color:var(--blue-tx);border-color:#93c5fd">Hoy</button>
+        <button onclick="changeWeek(1)" title="Semana siguiente (→)">Siguiente →</button>
         <div class="zoom-controls">
           <button class="zoom-btn" data-dir="out" onclick="zoomOut()" title="Reducir">−</button>
-          <span class="zoom-level">${Math.round(ZOOM_SCALES[ui.calZoom-1]*100)}%</span>
+          <span class="zoom-level">${Math.round((ZOOM_HEIGHTS[ui.calZoom-1]/62)*100)}%</span>
           <button class="zoom-btn" data-dir="in" onclick="zoomIn()" title="Ampliar">+</button>
         </div>
       </div>
@@ -1043,6 +1107,7 @@ function renderMain(){
 
   if(ui.level==='notas'){ renderNotas(); }
   else if(ui.level==='todos'){ renderSemanaView(dates,datesWE); }
+  else if(ui.level==='ot'){ renderOT(); }
   else {
     renderGrid(dates);
     renderToday(dates);
@@ -1060,22 +1125,66 @@ function renderGrid(dates){
   const g=document.getElementById('calGrid'); if(!g) return;
   const dispLv=ui.level==='todos'?'basica':ui.level;
   const blocks=getBlocks(dispLv);
-  let html='<div></div>';
-  dates.forEach((d,i)=>{
-    html+=`<div class="cal-head ${isToday(d)?'today':''}">${DAYS[i]}<br><b style="font-size:15px">${d.getDate()}</b></div>`;
+
+  // ── Pre-calcular fusiones de bloques consecutivos con el mismo curso ──
+  // skip[bi][di]=true  → esta celda ya la cubre el slot anterior (no renderizar)
+  // span[bi][di]=N     → este slot ocupa N filas
+  const skip = blocks.map(()=> dates.map(()=>false));
+  const span = blocks.map(()=> dates.map(()=>1));
+
+  dates.forEach((d,di)=>{
+    const ds=dStr(d);
+    for(let bi=0;bi<blocks.length;bi++){
+      if(blocks[bi].isBreak || skip[bi][di]) continue;
+      // Obtener booking de este slot
+      const bk1=_getBk(ds,bi,dispLv);
+      if(!bk1) continue;
+      // Buscar siguiente bloque no-recreo sin recreo entre medio
+      let nbi=bi+1;
+      while(nbi<blocks.length && blocks[nbi].isBreak) nbi++;
+      // Si hay un recreo estricto entre bi y nbi → no fusionar
+      const hasBreak = blocks.slice(bi+1,nbi).some(b=>b.isBreak);
+      if(hasBreak || nbi>=blocks.length) continue;
+      const bk2=_getBk(ds,nbi,dispLv);
+      if(bk2 && bk2.course===bk1.course && bk2.teacher===bk1.teacher){
+        span[bi][di]=2;
+        skip[nbi][di]=true;
+      }
+    }
   });
+
+  // ── Construir HTML usando grid con posicionamiento explícito ──
+  // Necesitamos grid-template-rows explícito para que grid-row span funcione
+  const nonBrkCount = blocks.filter(b=>!b.isBreak).length;
+  const brkCount    = blocks.filter(b=>b.isBreak).length;
+  // grid row 1 = headers; luego una por bloque
+  const rowTemplate = `auto ${blocks.map(()=>'auto').join(' ')}`;
+
+  let html='';
+  // Encabezados (fila 1)
+  html+=`<div style="grid-column:1;grid-row:1"></div>`;
+  dates.forEach((d,i)=>{
+    html+=`<div class="cal-head ${isToday(d)?'today':''}" style="grid-column:${i+2};grid-row:1">${DAYS[i]}<br><b style="font-size:15px">${d.getDate()}</b></div>`;
+  });
+
   blocks.forEach((bl,bi)=>{
+    const gridRow=bi+2; // fila CSS (1=headers, 2=bloque 0, …)
     if(bl.isBreak){
-      html+=`<div class="time-lbl"><span style="font-size:8px">${toAmPm(bl.start)}</span></div>`;
-      for(let i=0;i<5;i++) html+=`<div class="slot brk"><div class="brk-lbl">🌿 ${bl.label}</div></div>`;
+      html+=`<div class="time-lbl" style="grid-column:1;grid-row:${gridRow}"><span style="font-size:8px">${toAmPm(bl.start)}</span></div>`;
+      for(let di=0;di<5;di++){
+        html+=`<div class="slot brk" style="grid-column:${di+2};grid-row:${gridRow}"><div class="brk-lbl">🌿 ${bl.label}</div></div>`;
+      }
       return;
     }
-    html+=`<div class="time-lbl">
+    html+=`<div class="time-lbl" style="grid-column:1;grid-row:${gridRow}">
       <span style="font-weight:600;font-size:9px">${toAmPm(bl.start)}</span>
       <span class="time-end">${toAmPm(bl.end)}</span>
     </div>`;
-    dates.forEach(d=>{
+
+    dates.forEach((d,di)=>{
+      if(skip[bi][di]) return; // absorbida por el slot de arriba
       const ds=dStr(d);
+      const sp=span[bi][di]; // 1 o 2
       let bk=null,bkLv=null,bkKey=null;
       if(ui.level==='todos'){
         const kb=slotKey(ds,'b',bi),km=slotKey(ds,'m',bi);
@@ -1083,8 +1192,8 @@ function renderGrid(dates){
         else if(data.bookings[km]){ bk=data.bookings[km]; bkLv='media'; bkKey=km; }
       } else {
         const prefix=ui.level==='basica'?'b':'m';
-        const k=slotKey(ds,prefix,bi);
-        bk=data.bookings[k]; bkLv=ui.level; bkKey=k;
+        bkKey=slotKey(ds,prefix,bi);
+        bk=data.bookings[bkKey]; bkLv=ui.level;
       }
       const ck=bkKey||slotKey(ds,dispLv==='basica'?'b':'m',bi);
       const past=isPastSlot(d,bi,dispLv);
@@ -1092,33 +1201,56 @@ function renderGrid(dates){
       if(bk) cls+=bkLv==='basica'?' sb':' sm';
       else if(past) cls+=' is-past';
       else cls+=' can-click';
+
+      const rowSpanStyle = sp>1
+        ? `grid-column:${di+2};grid-row:${gridRow}/span ${sp};min-height:calc(var(--slot-h)*${sp} + ${(sp-1)*3}px)`
+        : `grid-column:${di+2};grid-row:${gridRow}`;
+
       let inner='';
       if(bk){
-        inner=`<div style="display:flex;align-items:flex-start;gap:2px">
+        // En celda fusionada mostrar el rango de hora completo
+        const endBl = sp>1 ? blocks[bi + blocks.slice(bi+1).findIndex(b=>!b.isBreak)+1] : null;
+        const timeRange = sp>1 && endBl ? `<div style="font-size:9px;color:${bkLv==='basica'?'#3b82f6':'#10b981'};margin-bottom:2px;font-family:'DM Mono',monospace">${toAmPm(bl.start)}–${toAmPm(endBl.end)}</div>` : '';
+        const spanBadge = sp>1 ? `<div class="span-badge">2 bloques</div>` : '';
+        inner=`${timeRange}${spanBadge}<div style="display:flex;align-items:flex-start;gap:2px">
           <div style="flex:1;overflow:hidden">
             <div class="slot-course">${esc(bk.course)}</div>
             <div class="slot-sub">${esc(bk.teacher||'')}</div>
           </div>
-          <button class="dup-btn" onclick="duplicateBook('${bkKey}','${ds}',${bi},'${bkLv}')" title="Duplicar al siguiente bloque">➕</button>
+          ${sp===1?`<button class="dup-btn" onclick="duplicateBook('${bkKey}','${ds}',${bi},'${bkLv}')" title="Duplicar al siguiente bloque">➕</button>`:''}
         </div>
         <div class="trow">
-          <button class="tbtn tok ${data.tickets[ck]==='ok'?'on':''}" onclick="event.stopPropagation();tick('${ck}','ok')">✓ Asistió</button>
-          <button class="tbtn tno ${data.tickets[ck]==='no'?'on':''}" onclick="event.stopPropagation();tick('${ck}','no')">✕ No</button>
+          <button class="tbtn tok ${data.tickets[ck]==='ok'?'on':''}" onclick="event.stopPropagation();tick('${ck}','ok')">✓</button>
+          <button class="tbtn tno ${data.tickets[ck]==='no'?'on':''}" onclick="event.stopPropagation();tick('${ck}','no')">✕</button>
         </div>`;
       } else if(!past){
         inner=`<div class="slot-plus">+</div>`;
       }
       const oc=(!past&&!bk)?`onclick="openBook('${ds}',${bi},'${dispLv}')"`:(bk?`onclick="openBook('${ds}',${bi},'${bkLv||dispLv}',true)"` :'');
-      html+=`<div class="${cls}" ${oc}>${inner}</div>`;
+      html+=`<div class="${cls}" style="${rowSpanStyle}" ${oc}>${inner}</div>`;
     });
   });
+
+  g.style.gridTemplateRows=rowTemplate;
   g.innerHTML=html;
+}
+
+// Helper: obtener booking para un slot dado día/bloque/nivel
+function _getBk(ds,bi,dispLv){
+  if(ui.level==='todos'){
+    const kb=slotKey(ds,'b',bi),km=slotKey(ds,'m',bi);
+    return data.bookings[kb]||data.bookings[km]||null;
+  }
+  const prefix=ui.level==='basica'?'b':'m';
+  return data.bookings[slotKey(ds,prefix,bi)]||null;
 }
 
 function renderToday(dates){
   const s=document.getElementById('todayCard'); if(!s) return;
   const td=dates.find(d=>isToday(d));
-  let html=`<div class="card-title">Clases de hoy</div>`;
+  const nowH=new Date().getHours(), nowM=new Date().getMinutes();
+  function isNowInSlot(bl){ const [sh,sm]=bl.start.split(':').map(Number),[eh,em]=bl.end.split(':').map(Number); const n=nowH*60+nowM; return n>=sh*60+sm&&n<eh*60+em; }
+  let html=`<div class="card-title">📅 Clases de hoy</div>`;
   if(!td){ s.innerHTML=html+`<p style="font-size:13px;color:var(--tx3)">Hoy no es día de semana.</p>`; return; }
   const lvls=ui.level==='todos'?['basica','media']:[ui.level];
   const items=[];
@@ -1130,9 +1262,11 @@ function renderToday(dates){
       const tk=data.tickets[key];
       const stc=tk==='ok'?'var(--green-tx)':tk==='no'?'var(--red-tx)':'var(--amber-tx)';
       const stl=tk==='ok'?'✓ Asistió':tk==='no'?'✕ No asistió':'⏳ Pendiente';
-      items.push(`<div class="status-row">
+      const enCurso=isNowInSlot(bl);
+      items.push(`<div class="status-row ${enCurso?'now-row':''}">
         <span style="font-size:11px;color:var(--tx3);min-width:72px;font-family:'DM Mono',monospace">${toAmPm(bl.start)}</span>
         <span class="badge ${lv==='basica'?'bb':'bm'}">${lv==='basica'?'Básica':'Media'}</span>
+        ${enCurso?`<span style="background:#dcfce7;color:#065f46;font-size:10px;font-weight:800;padding:1px 7px;border-radius:20px;animation:pulse 1.5s infinite">🟢 EN CURSO</span>`:''}
         <span style="font-size:13px;flex:1;margin:0 8px">${esc(bk.course)}${bk.teacher?` <span style="color:var(--tx3)">— ${esc(bk.teacher)}</span>`:''}</span>
         <span style="font-size:12px;font-weight:700;color:${stc};white-space:nowrap">${stl}</span>
       </div>`);
@@ -1229,9 +1363,11 @@ function renderWeekendToday(datesWE){
       const tk = data.tickets[k];
       const stc=tk==='ok'?'var(--green-tx)':tk==='no'?'var(--red-tx)':'var(--amber-tx)';
       const stl=tk==='ok'?'✓ Asistió':tk==='no'?'✕ No asistió':'⏳ Pendiente';
-      items.push(`<div class="status-row">
+      const enCurso=isNowInSlot(bl);
+      items.push(`<div class="status-row ${enCurso?'now-row':''}">
         <span style="font-size:11px;color:var(--tx3);min-width:72px;font-family:'DM Mono',monospace">${toAmPm(bl.start)}</span>
         <span class="badge ${lv==='basica'?'bb':'bm'}">${lv==='basica'?'Básica':'Media'}</span>
+        ${enCurso?`<span style="background:#dcfce7;color:#065f46;font-size:10px;font-weight:800;padding:1px 7px;border-radius:20px;animation:pulse 1.5s infinite">🟢 EN CURSO</span>`:''}
         <span style="font-size:13px;flex:1;margin:0 8px">${esc(bk.course)}${bk.teacher?` <span style="color:var(--tx3)">— ${esc(bk.teacher)}</span>`:''}</span>
         <span style="font-size:12px;font-weight:700;color:${stc};white-space:nowrap">${stl}</span>
       </div>`);
@@ -1266,7 +1402,18 @@ function removeWEBk(k){
 }
 
 function setLevel(l){ ui.level=l; renderMain(); }
-function changeWeek(d){ ui.weekOffset+=d; renderMain(); }
+function changeWeek(d){
+  if(d===0){ ui.weekOffset=0; }
+  else { ui.weekOffset+=d; }
+  renderMain();
+}
+// Keyboard nav: ← → arrows when not focused on input
+document.addEventListener('keydown',function(e){
+  if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.tagName==='SELECT') return;
+  if(e.key==='ArrowLeft'){ changeWeek(-1); }
+  else if(e.key==='ArrowRight'){ changeWeek(1); }
+  else if(e.key==='Home'){ changeWeek(0); }
+});
 
 // ══════════════════════════════════════════
 // BOOKING
@@ -1279,7 +1426,7 @@ function openBook(ds,bi,level,editMode){
   ui._saveWE = false;
   const bl=getBlocks(level)[bi];
   const modeLabel=editMode?'Editar':'Agendar';
-  document.getElementById('bookTitle').textContent=`${modeLabel} — ${bl.label} (${toAmPm(bl.start)} – ${toAmPm(bl.end)})`;
+  document.getElementById('bookTitle').innerHTML=`${modeLabel} — <span style="font-family:'DM Mono',monospace">${bl.label}</span><br><span style="font-size:12px;font-weight:400;opacity:.7">${toAmPm(bl.start)} → ${toAmPm(bl.end)}</span>`;
   document.getElementById('bCourse').value=existingBk?existingBk.course:'';
   document.getElementById('bTeacher').value=existingBk?existingBk.teacher:'';
   document.getElementById('bLevel').value=existingBk?existingBk.level:level;
@@ -1351,9 +1498,30 @@ function deleteFromModal(){
   saveData(); renderMain(); showToast('🗑️ Reserva eliminada');
 }
 function tick(key,val){
-  data.tickets[key]=data.tickets[key]===val?null:val;
-  saveData(); renderMain();
-  showToast(val==='ok'?'✓ Marcado: Asistió':'✕ Marcado: No asistió');
+  const newVal = data.tickets[key]===val ? null : val;
+  data.tickets[key] = newVal;
+
+  // — Sincronizar asistencia a TODAS las reservas del mismo curso en la semana visible —
+  const thisBk = data.bookings[key];
+  if(thisBk && thisBk.course){
+    const weekDates  = getWeekDates(ui.weekOffset);
+    const weekendDates = getWeekendDates(ui.weekOffset);
+    const allDates   = [...weekDates, ...weekendDates];
+    allDates.forEach(d => {
+      const ds = dStr(d);
+      const isWEDay = d.getDay()===0 || d.getDay()===6;
+      const bookingsForDay = getAllBookingsForDay(ds, isWEDay);
+      bookingsForDay.forEach(item => {
+        if(item.key !== key && item.bk.course === thisBk.course){
+          data.tickets[item.key] = newVal;
+        }
+      });
+    });
+  }
+
+  saveData();
+  renderMain();
+  showToast(newVal==='ok'?'✓ Asistió (aplicado a todo el curso)':newVal==='no'?'✕ No asistió (aplicado a todo el curso)':'↩️ Ticket removido', 2200);
 }
 
 // ══════════════════════════════════════════
@@ -1905,6 +2073,47 @@ function runSimulacro(){
   fireNotif(fakeItem, simMins, fakeItem.ds);
 }
 
+
+// ══════════════════════════════════════════
+// HELPER: agrupa clases del mismo curso/nivel/hora por día
+// Combina bloques contiguos del mismo curso en un rango de hora
+// Elimina filas duplicadas (mismo curso + mismo bloque exacto)
+// ══════════════════════════════════════════
+function mergeClasesDia(clases){
+  // 1. Deduplicar: si mismo curso+nivel tienen exactamente el mismo start/end (básica Y media al mismo horario), unir en una sola fila
+  const seen = new Map(); // key: course|start|end → primer item
+  const deduped = [];
+  clases.forEach(c => {
+    const k = `${c.bk.course}||${c.bl.start}||${c.bl.end}`;
+    if(!seen.has(k)){
+      seen.set(k, c);
+      deduped.push({...c, _niveles: [c.lv]});
+    } else {
+      // Agregar nivel al item ya existente
+      const existing = deduped.find(x => `${x.bk.course}||${x.bl.start}||${x.bl.end}` === k);
+      if(existing && !existing._niveles.includes(c.lv)) existing._niveles.push(c.lv);
+    }
+  });
+
+  // 2. Agrupar bloques consecutivos del mismo curso en un rango horario
+  const merged = [];
+  deduped.forEach(c => {
+    const last = merged[merged.length - 1];
+    if(last && last.bk.course === c.bk.course && last.bk.teacher === c.bk.teacher){
+      // Extender el rango de hora
+      if(c.bl.start < last._endTime) return; // subsumed, skip
+      last._endTime = c.bl.end;
+      last._niveles = [...new Set([...last._niveles, ...c._niveles])];
+      // ticket: si alguno es 'no', predomina; si alguno es 'ok', ok; sino null
+      if(c.tk === 'no') last.tk = 'no';
+      else if(c.tk === 'ok' && last.tk !== 'no') last.tk = 'ok';
+    } else {
+      merged.push({...c, _startTime: c.bl.start, _endTime: c.bl.end});
+    }
+  });
+  return merged;
+}
+
 // ══════════════════════════════════════════
 // VISTA SEMANA COMPLETA
 // ══════════════════════════════════════════
@@ -1955,16 +2164,20 @@ function renderSemanaView(dates, datesWE){
           <span style="font-size:13px;font-weight:700;color:${headerTxt}">${fd.charAt(0).toUpperCase()+fd.slice(1)}${esHoy?' 🟢':''}</span>
           <span style="font-size:11px;font-weight:600;color:${esHoy||isWE?'rgba(255,255,255,.7)':'var(--tx3)'}">${clases.length} clase${clases.length>1?'s':''}</span>
         </div>`;
-      clases.forEach((c,ci)=>{
+      const clasesMerged = mergeClasesDia(clases);
+      clasesMerged.forEach((c,ci)=>{
         const tk=c.tk;
         const stc=tk==='ok'?'#059669':tk==='no'?'#dc2626':'#d97706';
         const stl=tk==='ok'?'✓ Asistió':tk==='no'?'✕ No asistió':'⏳ Pendiente';
         const stBg=tk==='ok'?'#f0fdf4':tk==='no'?'#fef2f2':'#fefce8';
-        html+=`<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:${ci<clases.length-1?'1px solid var(--gray-bd)':'none'};background:#fff">
-          <div style="width:3px;height:40px;border-radius:2px;background:${c.lv==='basica'?'var(--blue)':'var(--green)'};flex-shrink:0"></div>
-          <div style="min-width:60px">
-            <div style="font-size:11px;font-weight:700;font-family:'DM Mono',monospace;color:var(--tx2)">${toAmPm(c.bl.start)}</div>
-            <div style="font-size:10px;color:var(--tx3)">${toAmPm(c.bl.end)}</div>
+        const lvColor = c._niveles&&c._niveles.length>1?'linear-gradient(var(--blue),var(--green))':c.lv==='basica'?'var(--blue)':'var(--green)';
+        const startT = toAmPm(c._startTime||c.bl.start);
+        const endT   = toAmPm(c._endTime||c.bl.end);
+        html+=`<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:${ci<clasesMerged.length-1?'1px solid var(--gray-bd)':'none'};background:#fff">
+          <div style="width:3px;height:40px;border-radius:2px;background:${lvColor};flex-shrink:0"></div>
+          <div style="min-width:72px">
+            <div style="font-size:11px;font-weight:700;font-family:'DM Mono',monospace;color:var(--tx2)">${startT}</div>
+            <div style="font-size:10px;color:var(--tx3)">→ ${endT}</div>
           </div>
           <div style="flex:1;min-width:0">
             <div style="font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.bk.course)}</div>
@@ -1986,55 +2199,333 @@ function renderSemanaView(dates, datesWE){
 }
 
 // ══════════════════════════════════════════
-// NOTAS
+// NOTAS (MEJORADO)
 // ══════════════════════════════════════════
 let _notesSaveTimer=null;
+const NOTA_COLORS=['#fefce8','#f0fdf4','#eff6ff','#fdf4ff','#fff7ed','#fef2f2'];
+const NOTA_COLOR_NAMES=['Amarillo','Verde','Azul','Violeta','Naranja','Rojo'];
+
 function renderNotas(){
   const s=document.getElementById('notasView'); if(!s) return;
   const notesList=Object.entries(data.notes||{}).sort((a,b)=>b[1].updatedAt-a[1].updatedAt);
-  s.innerHTML=`
-    <div class="card" style="margin-bottom:8px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <div style="font-size:13px;font-weight:700;color:var(--tx2)">📝 Notas</div>
-        <button class="btn btn-blue" style="padding:6px 14px;font-size:13px" onclick="createNota()">+ Nueva nota</button>
-      </div>
-      ${notesList.length===0?`<p style="font-size:13px;color:var(--tx3);text-align:center;padding:20px 0">No hay notas. Crea una con el botón +</p>`:''}
-      <div id="notasListContainer">
-        ${notesList.map(([nid,nota])=>`
-          <div class="nota-card" id="nota_${nid}">
-            <div class="nota-header">
-              <input class="nota-title-inp" placeholder="Título (opcional)" value="${esc(nota.title||'')}" oninput="scheduleNotaSave('${nid}','title',this.value)" />
-              <button class="nota-del" onclick="deleteNota('${nid}')" title="Eliminar nota">🗑️</button>
+  const pinned  = notesList.filter(([,n])=>n.pinned);
+  const unpinned= notesList.filter(([,n])=>!n.pinned);
+  const total=notesList.length;
+  const withBody=notesList.filter(([,n])=>n.body&&n.body.trim()).length;
+
+  const renderGroup=(list,label)=> list.length===0?'':`
+    <div style="font-size:11px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.06em;margin:10px 0 6px;padding:0 2px">${label}</div>
+    <div class="notas-grid">
+      ${list.map(([nid,nota])=>{
+        const color=nota.color||NOTA_COLORS[0];
+        const wordsCount=(nota.body||'').trim().split(/\s+/).filter(Boolean).length;
+        const ts=nota.updatedAt?new Date(nota.updatedAt).toLocaleString('es-CL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'Nueva';
+        return `<div class="nota-card2" id="nota_${nid}" style="background:${color};border-color:${color==='#fefce8'?'#fde047':color==='#f0fdf4'?'#86efac':color==='#eff6ff'?'#93c5fd':color==='#fdf4ff'?'#d8b4fe':color==='#fff7ed'?'#fdba74':'#fca5a5'}">
+          <div class="nota2-toolbar">
+            <button class="nota2-pin ${nota.pinned?'on':''}" onclick="toggleNotaPin('${nid}')" title="${nota.pinned?'Desfijar':'Fijar'}">📌</button>
+            <div class="nota2-colors">
+              ${NOTA_COLORS.map((c,ci)=>`<button class="nota2-color-dot ${nota.color===c||(!nota.color&&ci===0)?'sel':''}" style="background:${c};border-color:${ci===0?'#fde047':ci===1?'#86efac':ci===2?'#93c5fd':ci===3?'#d8b4fe':ci===4?'#fdba74':'#fca5a5'}" onclick="setNotaColor('${nid}','${c}')" title="${NOTA_COLOR_NAMES[ci]}"></button>`).join('')}
             </div>
-            <textarea class="nota-body" placeholder="Escribe aquí tu nota..." oninput="scheduleNotaSave('${nid}','body',this.value)">${esc(nota.body||'')}</textarea>
-            <div class="nota-meta">${nota.updatedAt?new Date(nota.updatedAt).toLocaleString('es-CL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'Ahora'}</div>
-          </div>`).join('')}
+            <button class="nota-del" onclick="deleteNota('${nid}')" title="Eliminar">🗑️</button>
+          </div>
+          <input class="nota-title-inp2" placeholder="Título..." value="${esc(nota.title||'')}" oninput="scheduleNotaSave('${nid}','title',this.value)" style="background:transparent"/>
+          <textarea class="nota-body2" placeholder="Escribe tu nota aquí..." oninput="scheduleNotaSave('${nid}','body',this.value)" style="background:transparent">${esc(nota.body||'')}</textarea>
+          <div class="nota2-footer">
+            <span class="nota2-meta">${ts}</span>
+            <span class="nota2-words">${wordsCount} palabra${wordsCount!==1?'s':''}</span>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+
+  s.innerHTML=`
+    <div class="card" style="padding:12px 14px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <div>
+          <div style="font-size:14px;font-weight:700;color:var(--tx2)">📝 Notas</div>
+          <div style="font-size:11px;color:var(--tx3);margin-top:2px">${total} nota${total!==1?'s':''} · ${withBody} con contenido</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <input id="notaSearch" placeholder="🔍 Buscar..." style="padding:7px 11px;font-size:13px;border:1.5px solid var(--gray-bd);border-radius:var(--rs);background:#fff;color:var(--text);font-family:inherit;width:160px" oninput="filterNotas(this.value)"/>
+          <button class="btn btn-blue" style="padding:7px 14px;font-size:13px;white-space:nowrap" onclick="createNota()">+ Nueva nota</button>
+        </div>
       </div>
+    </div>
+    <div id="notasListContainer">
+      ${total===0
+        ? `<div class="card" style="text-align:center;padding:40px 20px">
+            <div style="font-size:40px;margin-bottom:10px">📝</div>
+            <div style="font-size:15px;font-weight:600;color:var(--tx2);margin-bottom:6px">Sin notas todavía</div>
+            <div style="font-size:13px;color:var(--tx3);margin-bottom:16px">Crea tu primera nota con el botón de arriba</div>
+            <button class="btn btn-blue" style="padding:9px 20px" onclick="createNota()">+ Crear primera nota</button>
+          </div>`
+        : renderGroup(pinned,'📌 Fijadas') + renderGroup(unpinned, pinned.length?'Otras notas':'Todas las notas')
+      }
     </div>`;
 }
+
+function filterNotas(q){
+  const s=document.getElementById('notasView'); if(!s) return;
+  if(!q.trim()){ renderNotas(); return; }
+  const low=q.toLowerCase();
+  const filtered=Object.entries(data.notes||{}).filter(([,n])=>
+    (n.title||'').toLowerCase().includes(low)||(n.body||'').toLowerCase().includes(low)
+  ).sort((a,b)=>b[1].updatedAt-a[1].updatedAt);
+  const cont=document.getElementById('notasListContainer'); if(!cont) return;
+  if(!filtered.length){ cont.innerHTML=`<div class="card" style="text-align:center;padding:24px;color:var(--tx3);font-size:13px">Sin resultados para "${esc(q)}"</div>`; return; }
+  cont.innerHTML=`<div class="notas-grid">${filtered.map(([nid,nota])=>{
+    const color=nota.color||NOTA_COLORS[0];
+    return `<div class="nota-card2" style="background:${color}">
+      <input class="nota-title-inp2" style="background:transparent" value="${esc(nota.title||'')}" oninput="scheduleNotaSave('${nid}','title',this.value)" placeholder="Título..."/>
+      <textarea class="nota-body2" style="background:transparent" oninput="scheduleNotaSave('${nid}','body',this.value)">${esc(nota.body||'')}</textarea>
+    </div>`;
+  }).join('')}</div>`;
+}
+
 function createNota(){
   const nid='n_'+Date.now();
   if(!data.notes) data.notes={};
-  data.notes[nid]={title:'',body:'',createdAt:Date.now(),updatedAt:Date.now()};
+  data.notes[nid]={title:'',body:'',color:NOTA_COLORS[0],pinned:false,createdAt:Date.now(),updatedAt:Date.now()};
   saveData(); renderNotas();
-  setTimeout(()=>{ const ta=document.querySelector(`#nota_${nid} .nota-body`); if(ta) ta.focus(); },100);
+  setTimeout(()=>{ const ta=document.querySelector(`#nota_${nid} .nota-body2`); if(ta) ta.focus(); },100);
+}
+function toggleNotaPin(nid){
+  if(!data.notes[nid]) return;
+  data.notes[nid].pinned=!data.notes[nid].pinned;
+  data.notes[nid].updatedAt=Date.now();
+  saveData(); renderNotas();
+}
+function setNotaColor(nid,color){
+  if(!data.notes[nid]) return;
+  data.notes[nid].color=color;
+  data.notes[nid].updatedAt=Date.now();
+  saveData(); renderNotas();
 }
 function scheduleNotaSave(nid,field,val){
   if(!data.notes[nid]) return;
   data.notes[nid][field]=val; data.notes[nid].updatedAt=Date.now();
-  const meta=document.querySelector(`#nota_${nid} .nota-meta`);
-  if(meta) meta.textContent='Guardando…';
   clearTimeout(_notesSaveTimer);
-  _notesSaveTimer=setTimeout(()=>{
-    saveData();
-    const meta2=document.querySelector(`#nota_${nid} .nota-meta`);
-    if(meta2) meta2.textContent='Guardado ✓';
-  },800);
+  _notesSaveTimer=setTimeout(()=>{ saveData(); },600);
 }
 function deleteNota(nid){
   if(!confirm('¿Eliminar esta nota?')) return;
   delete data.notes[nid];
   saveData(); renderNotas(); showToast('Nota eliminada');
+}
+
+// ══════════════════════════════════════════
+// OT — ÓRDENES DE TRABAJO (Gmail)
+// ══════════════════════════════════════════
+function renderOT(){
+  const s=document.getElementById('otView'); if(!s) return;
+  if(!data.ots) data.ots={};
+  const otList=Object.entries(data.ots).sort((a,b)=>b[1].createdAt-a[1].createdAt);
+  const pending=otList.filter(([,o])=>!o.done).length;
+  const done=otList.filter(([,o])=>o.done).length;
+
+  s.innerHTML=`
+    <div class="card" style="padding:12px 14px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+        <div>
+          <div style="font-size:14px;font-weight:700;color:#6b21a8">🔧 Órdenes de Trabajo</div>
+          <div style="font-size:11px;color:var(--tx3);margin-top:2px">${pending} pendiente${pending!==1?'s':''} · ${done} realizada${done!==1?'s':''}</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn" style="background:#f3e8ff;color:#6b21a8;border:none;padding:7px 12px;font-size:12px;font-weight:700" onclick="fetchGmailOTs()">
+            📧 Sincronizar Gmail
+          </button>
+          <button class="btn" style="background:#6b21a8;color:#fff;border:none;padding:7px 14px;font-size:13px;font-weight:700" onclick="openNewOT()">
+            + Nueva OT
+          </button>
+        </div>
+      </div>
+      <div id="gmailSyncStatus" style="display:none"></div>
+    </div>
+
+    ${otList.length===0
+      ? `<div class="card" style="text-align:center;padding:40px 20px">
+          <div style="font-size:40px;margin-bottom:10px">🔧</div>
+          <div style="font-size:15px;font-weight:600;color:var(--tx2);margin-bottom:6px">Sin órdenes de trabajo</div>
+          <div style="font-size:13px;color:var(--tx3);margin-bottom:16px">Sincroniza tu Gmail para importar emails con código OS+número, o crea una manualmente</div>
+          <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+            <button class="btn" style="background:#f3e8ff;color:#6b21a8;border:none;padding:9px 18px;font-size:13px;font-weight:700" onclick="fetchGmailOTs()">📧 Sincronizar Gmail</button>
+            <button class="btn" style="background:#6b21a8;color:#fff;border:none;padding:9px 18px;font-size:13px;font-weight:700" onclick="openNewOT()">+ Nueva OT manual</button>
+          </div>
+        </div>`
+      : `<div id="otListContainer">
+          ${renderOTList(otList)}
+        </div>`
+    }
+
+    <!-- Modal Nueva OT -->
+    <div id="otModal" class="modal-bg" style="display:none" onclick="if(event.target===this)closeOTModal()">
+      <div class="modal" style="max-width:420px">
+        <h3>🔧 Nueva Orden de Trabajo</h3>
+        <div class="fr"><label>Código OS</label>
+          <input class="inp" id="ot_codigo" placeholder="Ej: OS-1234" style="font-family:'DM Mono',monospace;font-weight:700"/>
+        </div>
+        <div class="fr"><label>Descripción</label>
+          <textarea class="inp" id="ot_desc" placeholder="Descripción del trabajo..." style="min-height:80px;resize:vertical"></textarea>
+        </div>
+        <div class="fr"><label>Prioridad</label>
+          <select class="inp" id="ot_prio">
+            <option value="normal">Normal</option>
+            <option value="alta">Alta</option>
+            <option value="urgente">Urgente</option>
+          </select>
+        </div>
+        <div class="fr"><label>Origen</label>
+          <input class="inp" id="ot_origen" placeholder="Ej: Email, Verbal, Sistema..." value="Manual"/>
+        </div>
+        <div class="btn-row">
+          <button class="btn-ghost" style="flex:1" onclick="closeOTModal()">Cancelar</button>
+          <button class="btn btn-blue" style="flex:1" onclick="saveNewOT()">Crear OT ✓</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderOTList(otList){
+  const pending=otList.filter(([,o])=>!o.done);
+  const done   =otList.filter(([,o])=>o.done);
+  const renderItem=([oid,ot])=>{
+    const prioColor=ot.priority==='urgente'?'#dc2626':ot.priority==='alta'?'#d97706':'#6b7280';
+    const prioBg=ot.priority==='urgente'?'#fee2e2':ot.priority==='alta'?'#fef3c7':'#f3f4f6';
+    const ts=ot.createdAt?new Date(ot.createdAt).toLocaleDateString('es-CL',{day:'numeric',month:'short',year:'numeric'}):'—';
+    const gmailBadge=ot.fromGmail?`<span style="background:#e8f0fe;color:#1a56db;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700">📧 Gmail</span>`:'';
+    return `<div class="ot-item ${ot.done?'ot-done':''}" id="ot_${oid}">
+      <div class="ot-check-col">
+        <label class="ot-check-wrap" title="${ot.done?'Marcar pendiente':'Marcar como realizada'}">
+          <input type="checkbox" class="ot-check" ${ot.done?'checked':''} onchange="toggleOT('${oid}',this.checked)"/>
+          <span class="ot-checkmark"></span>
+        </label>
+      </div>
+      <div class="ot-body">
+        <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:3px">
+          <span class="ot-code">${esc(ot.code||'—')}</span>
+          <span style="background:${prioBg};color:${prioColor};padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700">${ot.priority||'normal'}</span>
+          ${gmailBadge}
+          ${ot.doneAt?`<span style="background:#d1fae5;color:#065f46;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700">✓ ${new Date(ot.doneAt).toLocaleDateString('es-CL',{day:'numeric',month:'short'})}</span>`:''}
+        </div>
+        <div class="ot-desc">${esc(ot.description||'Sin descripción')}</div>
+        ${ot.origen?`<div style="font-size:10px;color:var(--tx3);margin-top:2px">Origen: ${esc(ot.origen)}</div>`:''}
+        <div style="font-size:10px;color:var(--tx3);margin-top:3px">Creada: ${ts}${ot.gmailDate?` · Email: ${esc(ot.gmailDate)}`:''}${ot.gmailFrom?` · De: ${esc(ot.gmailFrom)}`:''}${ot.gmailSubject?`<br><span style="color:#6b7280">Asunto: ${esc(ot.gmailSubject)}</span>`:''}</div>
+      </div>
+      <div class="ot-actions">
+        <button class="ot-del-btn" onclick="deleteOT('${oid}')" title="Eliminar">🗑️</button>
+      </div>
+    </div>`;
+  };
+  let html='';
+  if(pending.length){
+    html+=`<div style="font-size:11px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px">⏳ Pendientes (${pending.length})</div>`;
+    html+=pending.map(renderItem).join('');
+  }
+  if(done.length){
+    html+=`<div style="font-size:11px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.06em;margin:14px 0 8px">✅ Realizadas (${done.length})</div>`;
+    html+=done.map(renderItem).join('');
+  }
+  return html;
+}
+
+function toggleOT(oid, checked){
+  if(!data.ots[oid]) return;
+  data.ots[oid].done=checked;
+  data.ots[oid].doneAt=checked?Date.now():null;
+  saveData();
+  // Re-render solo la lista
+  const cont=document.getElementById('otListContainer');
+  if(cont){
+    const otList=Object.entries(data.ots).sort((a,b)=>b[1].createdAt-a[1].createdAt);
+    cont.innerHTML=renderOTList(otList);
+  } else { renderOT(); }
+  showToast(checked?'✅ OT marcada como realizada':'↩️ OT marcada como pendiente');
+}
+
+function deleteOT(oid){
+  if(!confirm('¿Eliminar esta OT?')) return;
+  delete data.ots[oid];
+  saveData(); renderOT(); showToast('OT eliminada');
+}
+
+function openNewOT(){
+  document.getElementById('otModal').style.display='flex';
+  setTimeout(()=>document.getElementById('ot_codigo').focus(),100);
+}
+function closeOTModal(){ document.getElementById('otModal').style.display='none'; }
+
+function saveNewOT(){
+  const code=document.getElementById('ot_codigo').value.trim();
+  const desc=document.getElementById('ot_desc').value.trim();
+  const prio=document.getElementById('ot_prio').value;
+  const origen=document.getElementById('ot_origen').value.trim()||'Manual';
+  if(!code){ showToast('Ingresa el código OS'); return; }
+  if(!data.ots) data.ots={};
+  const oid='ot_'+Date.now();
+  data.ots[oid]={code,description:desc,priority:prio,origen,done:false,doneAt:null,createdAt:Date.now()};
+  saveData(); closeOTModal(); renderOT();
+  showToast(`✓ OT ${code} creada`);
+}
+
+// ── SINCRONIZACIÓN CON GMAIL via MCP ──
+function fetchGmailOTs(){
+  // La sincronización automática con Gmail no está disponible en esta versión.
+  const statusEl=document.getElementById('gmailSyncStatus');
+  if(statusEl){
+    statusEl.style.display='block';
+    statusEl.innerHTML=`<div style="background:#fefce8;border:1.5px solid #fde047;border-radius:var(--rs);padding:12px 16px;font-size:13px;color:#854d0e;line-height:1.6">
+      ℹ️ <b>Sincronización con Gmail no disponible</b><br>
+      <span style="font-size:12px">Esta función requiere una integración que no está activa. Crea tus OT manualmente con el formulario de abajo.</span>
+    </div>`;
+    setTimeout(()=>{ statusEl.style.display='none'; }, 5000);
+  }
+  showToast('ℹ️ Usa el formulario para crear OT manualmente', 3500);
+}
+// ══════════════════════════════════════════
+// IMPRIMIR
+// ══════════════════════════════════════════
+function printWeek(){
+  const dates=getWeekDates(ui.weekOffset);
+  const f=dates[0],l=dates[4];
+  const wl=`${f.toLocaleDateString('es-CL',{day:'numeric',month:'long'})} — ${l.toLocaleDateString('es-CL',{day:'numeric',month:'long',year:'numeric'})}`;
+  const lvls=['basica','media'];
+  let rows='';
+  dates.forEach(d=>{
+    const ds=dStr(d);
+    const clases=getAllBookingsForDay(ds,false);
+    if(!clases.length) return;
+    const fd=d.toLocaleDateString('es-CL',{weekday:'long',day:'numeric',month:'long'});
+    rows+=`<tr><td colspan="4" style="background:#1a56db;color:#fff;font-weight:700;padding:7px 10px;font-size:13px">${fd.charAt(0).toUpperCase()+fd.slice(1)}</td></tr>`;
+    mergeClasesDia(clases.map(c=>({...c,tk:data.tickets[c.key]}))).forEach(c=>{
+      const tk=c.tk;
+      const stl=tk==='ok'?'✓ Asistió':tk==='no'?'✕ No asistió':'⏳ Pendiente';
+      const stc=tk==='ok'?'#065f46':tk==='no'?'#991b1b':'#92400e';
+      const startT=toAmPm(c._startTime||c.bl.start);
+      const endT  =toAmPm(c._endTime  ||c.bl.end);
+      const nivelTxt = c._niveles&&c._niveles.length>1?'Básica + Media':c.lv==='basica'?'Básica':'Media';
+      const nivelBg  = c._niveles&&c._niveles.length>1?'#e0e7ff':'#eff6ff';
+      const nivelClr = c._niveles&&c._niveles.length>1?'#3730a3':c.lv==='basica'?'#1e3a8a':'#065f46';
+      rows+=`<tr>
+        <td style="padding:6px 10px;font-size:12px;color:#374151;font-family:monospace">${startT}<br><span style="color:#9ca3af;font-size:10px">→ ${endT}</span></td>
+        <td style="padding:6px 10px;font-size:12px"><span style="background:${nivelBg};color:${nivelClr};padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700">${nivelTxt}</span></td>
+        <td style="padding:6px 10px;font-size:13px;font-weight:600">${c.bk.course}${c.bk.teacher?`<br><span style="font-size:11px;font-weight:400;color:#6b7280">Prof. ${c.bk.teacher}</span>`:''}</td>
+        <td style="padding:6px 10px;font-size:11px;font-weight:700;color:${stc}">${stl}</td>
+      </tr>`;
+    });
+  });
+  const win=window.open('','_blank','width=800,height=600');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Horario — ${esc(cfg.schoolName)}</title>
+  <style>*{box-sizing:border-box}body{font-family:system-ui,sans-serif;margin:0;padding:20px;color:#111}
+  h1{font-size:18px;margin:0 0 4px}p{font-size:12px;color:#6b7280;margin:0 0 16px}
+  table{width:100%;border-collapse:collapse}td{border-bottom:1px solid #e5e7eb}
+  @media print{body{padding:10px}.no-print{display:none}}</style></head>
+  <body>
+  <div class="no-print" style="margin-bottom:16px"><button onclick="window.print()" style="background:#1a56db;color:#fff;border:none;border-radius:8px;padding:9px 20px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimir</button></div>
+  <h1>🖥️ ${esc(cfg.schoolName)}</h1>
+  <p>Taller de Computación · Semana: ${wl}</p>
+  <table>${rows||'<tr><td colspan="4" style="padding:20px;color:#9ca3af;text-align:center">Sin clases agendadas esta semana.</td></tr>'}</table>
+  </body></html>`);
+  win.document.close();
 }
 
 // ══════════════════════════════════════════
@@ -2102,21 +2593,24 @@ function exportPDF(){
       doc.setFontSize(8);doc.setFont(undefined,'normal');
       doc.text(`${clases.length} clase${clases.length>1?'s':''}`,W-18,yPos+6.8,{align:'right'});
       yPos+=12;
-      clases.forEach((c,ci)=>{
+      mergeClasesDia(clases).forEach((c,ci)=>{
         const rH=18;
+        const isMultiNivel = c._niveles && c._niveles.length > 1;
+        const barColor = isMultiNivel ? [99,102,241] : (c.lv==='basica'?BLUE:GREEN);
+        const badgeBg  = isMultiNivel ? [224,231,255] : (c.lv==='basica'?BLT:GLT);
+        const badgeTxt = isMultiNivel ? 'Bás+Med' : (c.lv==='basica'?'Básica':'Media');
         doc.setFillColor(...(ci%2===0?WHT:GLY));doc.rect(14,yPos,W-28,rH,'F');
-        doc.setFillColor(...(c.lv==='basica'?BLUE:GREEN));doc.rect(14,yPos,3,rH,'F');
-        const tS=toAmPm(c.bl.start), tE=toAmPm(c.bl.end);
-        doc.setTextColor(...(c.lv==='basica'?BLUE:GREEN));
+        doc.setFillColor(...barColor);doc.rect(14,yPos,3,rH,'F');
+        const tS=toAmPm(c._startTime||c.bl.start), tE=toAmPm(c._endTime||c.bl.end);
+        doc.setTextColor(...barColor);
         doc.setFontSize(7.5);doc.setFont(undefined,'bold');doc.text(tS,20,yPos+6.5);
-        doc.setFontSize(6.5);doc.setFont(undefined,'normal');doc.text(tE,20,yPos+12);
-        doc.setTextColor(...GRAY);doc.setFontSize(6.5);doc.text(c.bl.label,20,yPos+16.5);
-        doc.setFillColor(...(c.lv==='basica'?BLT:GLT));doc.roundedRect(40,yPos+3.5,17,5,1,1,'F');
-        doc.setTextColor(...(c.lv==='basica'?BLUE:GREEN));doc.setFontSize(6.5);doc.setFont(undefined,'bold');
-        doc.text(c.lv==='basica'?'Básica':'Media',48.5,yPos+7.2,{align:'center'});
+        doc.setFontSize(6.5);doc.setFont(undefined,'normal');doc.text('→ '+tE,20,yPos+12);
+        doc.setFillColor(...badgeBg);doc.roundedRect(40,yPos+3.5,isMultiNivel?20:17,5,1,1,'F');
+        doc.setTextColor(...barColor);doc.setFontSize(6);doc.setFont(undefined,'bold');
+        doc.text(badgeTxt,isMultiNivel?50:48.5,yPos+7.2,{align:'center'});
         doc.setTextColor(17,24,39);doc.setFontSize(8.5);doc.setFont(undefined,'bold');
-        doc.text((c.bk.course.length>32?c.bk.course.slice(0,30)+'…':c.bk.course),60,yPos+7);
-        if(c.bk.teacher){doc.setTextColor(...GRAY);doc.setFontSize(7);doc.setFont(undefined,'normal');doc.text(`Prof. ${c.bk.teacher}`.slice(0,28),60,yPos+13.5);}
+        doc.text((c.bk.course.length>32?c.bk.course.slice(0,30)+'…':c.bk.course),63,yPos+7);
+        if(c.bk.teacher){doc.setTextColor(...GRAY);doc.setFontSize(7);doc.setFont(undefined,'normal');doc.text(`Prof. ${c.bk.teacher}`.slice(0,28),63,yPos+13.5);}
         let sC,sL,sB;
         if(c.tk==='ok'){sC=GREEN;sL='✓ Asistió';sB=GLT;}
         else if(c.tk==='no'){sC=RED;sL='✕ No asistió';sB=[254,226,226];}
