@@ -1500,28 +1500,9 @@ function deleteFromModal(){
 function tick(key,val){
   const newVal = data.tickets[key]===val ? null : val;
   data.tickets[key] = newVal;
-
-  // — Sincronizar asistencia a TODAS las reservas del mismo curso en la semana visible —
-  const thisBk = data.bookings[key];
-  if(thisBk && thisBk.course){
-    const weekDates  = getWeekDates(ui.weekOffset);
-    const weekendDates = getWeekendDates(ui.weekOffset);
-    const allDates   = [...weekDates, ...weekendDates];
-    allDates.forEach(d => {
-      const ds = dStr(d);
-      const isWEDay = d.getDay()===0 || d.getDay()===6;
-      const bookingsForDay = getAllBookingsForDay(ds, isWEDay);
-      bookingsForDay.forEach(item => {
-        if(item.key !== key && item.bk.course === thisBk.course){
-          data.tickets[item.key] = newVal;
-        }
-      });
-    });
-  }
-
   saveData();
   renderMain();
-  showToast(newVal==='ok'?'✓ Asistió (aplicado a todo el curso)':newVal==='no'?'✕ No asistió (aplicado a todo el curso)':'↩️ Ticket removido', 2200);
+  showToast(newVal==='ok'?'✓ Asistió':newVal==='no'?'✕ No asistió':'↩️ Ticket removido', 1800);
 }
 
 // ══════════════════════════════════════════
