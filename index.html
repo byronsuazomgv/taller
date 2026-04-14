@@ -517,7 +517,7 @@ button,input,select{font-family:inherit;}
     <div class="modal">
       <h3 id="bookTitle">Agendar clase</h3>
       <div class="fr"><label>Curso / Asignatura</label>
-        <input class="inp" id="bCourse" placeholder="Ej: 5°A — Tecnología" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"/>
+        <input class="inp" id="bCourse" placeholder="Ej: 5°A — Tecnología" />
       </div>
       <div class="fr"><label>Nivel</label>
         <select class="inp" id="bLevel">
@@ -1696,19 +1696,22 @@ function initEmailJS(callback) {
       try {
         emailjs.init({ publicKey: EJS.publicKey });
         ejsReady = true;
-        addNotifLog('EmailJS inicializado correctamente', 'ok');
+        addNotifLog('EmailJS listo ✓', 'ok');
         if(callback) callback();
       } catch(e) {
+        ejsReady = false;
         addNotifLog(`Error al iniciar EmailJS: ${e.message}`, 'err');
+        if(callback) callback();
       }
     } else if(attempts > 0) {
-      setTimeout(() => tryInit(attempts - 1), 800);
+      setTimeout(() => tryInit(attempts - 1), 600);
     } else {
-      addNotifLog('EmailJS no pudo cargar después de varios intentos', 'err');
-      if(callback) callback(); // Igual arrancar el motor
+      ejsReady = false;
+      addNotifLog('EmailJS no pudo cargar — solo se usará GAS', 'warn');
+      if(callback) callback();
     }
   }
-  tryInit(10); // Hasta 8 segundos de espera
+  tryInit(15); // ~9 segundos máximo
 }
 
 // ── GAS: sincronizar todos los bookings al script ──
@@ -1962,85 +1965,138 @@ function getAllBookingsForDay(ds, isWEDay) {
   return items;
 }
 
-// Dispara la notificación (browser + email via EmailJS)
+// Dispara la notificación (browser + email via EmailJS + GAS fallback)
 function fireNotif(item, minsAntes, ds) {
-  const lv       = item.lv === 'basica' ? 'Educación Básica' : 'Educación Media';
-  const es1min   = minsAntes === 1;
-  const horario  = `${toAmPm(item.bl.start)} – ${toAmPm(item.bl.end)}`;
-  
+  const lv      = item.lv === 'basica' ? 'Educación Básica' : 'Educación Media';
+  const es1min  = minsAntes === 1;
+  const horario = `${toAmPm(item.bl.start)} – ${toAmPm(item.bl.end)}`;
+  const fecha   = (() => {
+    try {
+      const [y,m,d2] = ds.split('-').map(Number);
+      return new Date(y,m-1,d2).toLocaleDateString('es-CL',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    } catch(e){ return ds; }
+  })();
+
   const asunto = es1min
-    ? `🚨 ¡1 minuto! Abre el Taller — ${item.bk.course}`
-    : `⏰ ${minsAntes} min — Taller de Computación: ${item.bk.course}`;
-  
-  const mensaje = es1min
-    ? `⚠️ ¡Es hora de ABRIR el Taller!\n\nCurso: ${item.bk.course}\nEstablecimiento: ${cfg.schoolName}\nNivel: ${lv}\nHorario: ${horario}\nProfesor: ${item.bk.teacher||'—'}\nFecha: ${ds}\n\n👉 Ve a abrir el laboratorio AHORA.`
-    : `Recordatorio anticipado — faltan ${minsAntes} minutos.\n\nCurso: ${item.bk.course}\nEstablecimiento: ${cfg.schoolName}\nNivel: ${lv}\nHorario: ${horario}\nProfesor: ${item.bk.teacher||'—'}\nFecha: ${ds}\n\n🕐 Prepara todo con anticipación.`;
+    ? `🚨 ¡Abrir Taller AHORA! — ${item.bk.course} (${toAmPm(item.bl.start)})`
+    : `⏰ Faltan ${minsAntes} min — ${item.bk.course} (${toAmPm(item.bl.start)})`;
+
+  // Texto plano (para EmailJS template {{mensaje}})
+  const mensajeTxt = es1min
+    ? `¡ES HORA DE ABRIR EL TALLER!\n\nCurso: ${item.bk.course}\nNivel: ${lv}\nHorario: ${horario}\nProfesor: ${item.bk.teacher||'—'}\nFecha: ${fecha}\nEstablecimiento: ${cfg.schoolName}\n\n👉 Ve a abrir el laboratorio AHORA.`
+    : `Recordatorio: faltan ${minsAntes} minutos para la clase.\n\nCurso: ${item.bk.course}\nNivel: ${lv}\nHorario: ${horario}\nProfesor: ${item.bk.teacher||'—'}\nFecha: ${fecha}\nEstablecimiento: ${cfg.schoolName}\n\n🕐 Prepara todo con anticipación.`;
+
+  // HTML enriquecido (para template {{mensaje_html}} si lo tienes)
+  const color = es1min ? '#dc2626' : '#1a56db';
+  const emoji = es1min ? '🚨' : '⏰';
+  const mensajeHtml = `
+<div style="font-family:system-ui,sans-serif;max-width:500px;margin:0 auto">
+  <div style="background:${color};color:#fff;padding:16px 20px;border-radius:10px 10px 0 0;text-align:center">
+    <div style="font-size:32px">${emoji}</div>
+    <div style="font-size:18px;font-weight:700;margin-top:6px">${es1min?'¡Abre el Taller AHORA!':'Recordatorio de Clase'}</div>
+    ${es1min?'':'<div style="font-size:13px;opacity:.85;margin-top:2px">Faltan '+minsAntes+' minutos</div>'}
+  </div>
+  <div style="background:#fff;border:1px solid #e5e7eb;border-top:none;padding:20px;border-radius:0 0 10px 10px">
+    <table style="width:100%;border-collapse:collapse;font-size:14px">
+      <tr><td style="padding:6px 0;color:#6b7280;width:110px">📚 Curso</td><td style="padding:6px 0;font-weight:600;color:#111827">${item.bk.course}</td></tr>
+      <tr><td style="padding:6px 0;color:#6b7280">🎓 Nivel</td><td style="padding:6px 0;color:#374151">${lv}</td></tr>
+      <tr><td style="padding:6px 0;color:#6b7280">🕐 Horario</td><td style="padding:6px 0;font-weight:600;color:#1a56db">${horario}</td></tr>
+      <tr><td style="padding:6px 0;color:#6b7280">👤 Profesor</td><td style="padding:6px 0;color:#374151">${item.bk.teacher||'—'}</td></tr>
+      <tr><td style="padding:6px 0;color:#6b7280">📅 Fecha</td><td style="padding:6px 0;color:#374151">${fecha}</td></tr>
+      <tr><td style="padding:6px 0;color:#6b7280">🏫 Colegio</td><td style="padding:6px 0;color:#374151">${cfg.schoolName}</td></tr>
+    </table>
+    ${es1min?'<div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:12px;margin-top:14px;color:#dc2626;font-weight:600;text-align:center">👉 Dirígete al laboratorio inmediatamente</div>':''}
+  </div>
+  <div style="text-align:center;font-size:11px;color:#9ca3af;margin-top:10px">Taller de Computación · ${cfg.schoolName}</div>
+</div>`.trim();
 
   // Notificación del navegador
   if('Notification' in window && Notification.permission === 'granted'){
     try {
       new Notification(asunto, {
-        body: `${lv} · ${horario}${item.bk.teacher?' · '+item.bk.teacher:''}`,
-        icon: '🖥️'
+        body: `${lv} · ${horario}${item.bk.teacher ? ' · ' + item.bk.teacher : ''}`,
+        icon: '/favicon.ico'
       });
     } catch(e) { console.warn('[Browser Notif]', e); }
   }
 
-  // Email via EmailJS
-  sendEmail(item, asunto, mensaje);
-  
+  // Enviar email (EmailJS con fallback a GAS)
+  sendEmail(item, asunto, mensajeTxt, mensajeHtml, 0);
 }
 
-function sendEmail(item, asunto, mensaje, retryCount = 0) {
+function sendEmail(item, asunto, mensajeTxt, mensajeHtml, retryCount = 0) {
   if(!cfg || !cfg.email) {
     addNotifLog('❌ Sin correo configurado', 'err');
     return;
   }
-  
-  const lv2 = item.lv === 'basica' ? 'Educación Básica' : 'Educación Media';
+  // Compatibilidad: si se llama con 4 args sin HTML
+  if(typeof mensajeHtml === 'number'){ retryCount = mensajeHtml; mensajeHtml = mensajeTxt; }
+  if(!mensajeHtml) mensajeHtml = mensajeTxt;
+
+  const lv2    = item.lv === 'basica' ? 'Educación Básica' : 'Educación Media';
+  const horario = `${toAmPm(item.bl.start)} – ${toAmPm(item.bl.end)}`;
+
+  // Parámetros exhaustivos — cubre CUALQUIER naming del template EmailJS
   const params = {
-    // Standard EmailJS fields
-    to_email:    cfg.email,
-    reply_to:    cfg.email,
-    // Template variables (cover common naming conventions)
-    subject:     asunto,
-    curso:       item.bk.course,
-    asunto:      asunto,
-    profesor:    item.bk.teacher || '—',
-    nivel:       lv2,
-    fecha:       item.ds,
-    horario:     `${toAmPm(item.bl.start)} – ${toAmPm(item.bl.end)}`,
-    fecha_hora:  `${item.ds} | ${toAmPm(item.bl.start)} – ${toAmPm(item.bl.end)}`,
-    mensaje,
-    name:        cfg.schoolName,
-    school:      cfg.schoolName,
-    to_name:     cfg.schoolName
+    to_email:      cfg.email,
+    to_name:       cfg.schoolName,
+    reply_to:      cfg.email,
+    from_name:     'Taller de Computación',
+    // Asunto / subject (distintos nombres según template)
+    subject:       asunto,
+    asunto:        asunto,
+    titulo:        asunto,
+    // Cuerpo del mensaje
+    message:       mensajeTxt,
+    mensaje:       mensajeTxt,
+    body:          mensajeTxt,
+    message_html:  mensajeHtml,
+    mensaje_html:  mensajeHtml,
+    html_message:  mensajeHtml,
+    // Datos de la clase
+    curso:         item.bk.course,
+    course:        item.bk.course,
+    clase:         item.bk.course,
+    profesor:      item.bk.teacher || '—',
+    teacher:       item.bk.teacher || '—',
+    nivel:         lv2,
+    level:         lv2,
+    horario,
+    hora:          horario,
+    time:          horario,
+    fecha:         item.ds,
+    date:          item.ds,
+    fecha_hora:    `${item.ds} | ${horario}`,
+    // Establecimiento
+    name:          cfg.schoolName,
+    school:        cfg.schoolName,
+    colegio:       cfg.schoolName,
+    establecimiento: cfg.schoolName
   };
-  
+
   if(!ejsReady) {
-    if(retryCount < 5) {
-      addNotifLog(`⏳ EmailJS no listo, reintentando en 3s (intento ${retryCount+1})`, 'warn');
-      setTimeout(() => sendEmail(item, asunto, mensaje, retryCount+1), 3000);
+    if(retryCount < 3) {
+      addNotifLog(`⏳ EmailJS no listo — reintentando en 2s (${retryCount+1}/3)`, 'warn');
+      setTimeout(() => sendEmail(item, asunto, mensajeTxt, mensajeHtml, retryCount+1), 2000);
     } else {
-      addNotifLog('❌ EmailJS no está disponible después de varios intentos', 'err');
+      addNotifLog('⚠️ EmailJS no disponible — enviando vía GAS', 'warn');
+      sendNotifViaGAS(item, asunto, mensajeTxt);
     }
     return;
   }
-  
+
   emailjs.send(EJS.serviceId, EJS.templateId, params)
     .then(() => {
       addNotifLog(`✅ Email enviado: ${item.bk.course} → ${cfg.email}`, 'ok');
     })
     .catch(e => {
-      const errMsg = e.status ? `${e.status}: ${e.text}` : JSON.stringify(e);
-      addNotifLog(`❌ Error EmailJS: ${errMsg}`, 'err');
+      const errMsg = e.status ? `HTTP ${e.status}: ${e.text||'error'}` : String(e);
+      addNotifLog(`❌ EmailJS error (intento ${retryCount+1}): ${errMsg}`, 'err');
       if(retryCount < 2) {
-        // Reintentar vía EmailJS
-        setTimeout(() => sendEmail(item, asunto, mensaje, retryCount+1), 5000);
+        setTimeout(() => sendEmail(item, asunto, mensajeTxt, mensajeHtml, retryCount+1), 4000);
       } else {
-        // Todos los intentos EmailJS fallaron — usar GAS como fallback
-        addNotifLog('⚠️ EmailJS falló 3 veces, usando GAS como fallback', 'warn');
-        sendNotifViaGAS(item, asunto, mensaje);
+        addNotifLog('⚠️ EmailJS falló — usando GAS como respaldo', 'warn');
+        sendNotifViaGAS(item, asunto, mensajeTxt);
       }
     });
 }
@@ -2072,32 +2128,77 @@ function sendNotifViaGAS(item, asunto, mensaje){
 // ── TEST DE CORREO ──
 function testEmail(){
   if(!cfg||!cfg.email){ showToast('Configura tu correo primero'); return; }
+
+  const ahora    = new Date().toLocaleString('es-CL');
+  const asunto   = `✅ PRUEBA — Taller de Computación (${cfg.schoolName})`;
+  const mensajeTxt = `Correo de prueba enviado el ${ahora}.\n\nEstablecimiento: ${cfg.schoolName}\nCorreo: ${cfg.email}\nAviso configurado: ${cfg.minutes > 0 ? cfg.minutes + ' min antes' : 'Solo 1 min'}\n\nSi recibes este correo, el sistema funciona correctamente.\n\n🖥️ Sistema de Gestión de Laboratorio`;
+  const mensajeHtml = `
+<div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto">
+  <div style="background:#059669;color:#fff;padding:16px 20px;border-radius:10px 10px 0 0;text-align:center">
+    <div style="font-size:32px">✅</div>
+    <div style="font-size:17px;font-weight:700;margin-top:6px">Sistema funcionando correctamente</div>
+  </div>
+  <div style="background:#fff;border:1px solid #e5e7eb;border-top:none;padding:20px;border-radius:0 0 10px 10px">
+    <table style="width:100%;border-collapse:collapse;font-size:14px">
+      <tr><td style="padding:5px 0;color:#6b7280;width:110px">🏫 Colegio</td><td style="padding:5px 0;font-weight:600">${cfg.schoolName}</td></tr>
+      <tr><td style="padding:5px 0;color:#6b7280">📧 Correo</td><td style="padding:5px 0">${cfg.email}</td></tr>
+      <tr><td style="padding:5px 0;color:#6b7280">⏰ Aviso</td><td style="padding:5px 0">${cfg.minutes > 0 ? cfg.minutes + ' min antes + 1 min' : 'Solo 1 min antes'}</td></tr>
+      <tr><td style="padding:5px 0;color:#6b7280">📅 Enviado</td><td style="padding:5px 0">${ahora}</td></tr>
+    </table>
+    <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:12px;margin-top:14px;color:#065f46;font-size:13px">
+      ✔ Si recibes este correo, las alertas automáticas llegarán correctamente antes de cada clase.
+    </div>
+  </div>
+</div>`.trim();
+
+  const params = {
+    to_email:      cfg.email,
+    to_name:       cfg.schoolName,
+    reply_to:      cfg.email,
+    from_name:     'Taller de Computación',
+    subject:       asunto,
+    asunto:        asunto,
+    titulo:        asunto,
+    message:       mensajeTxt,
+    mensaje:       mensajeTxt,
+    body:          mensajeTxt,
+    message_html:  mensajeHtml,
+    mensaje_html:  mensajeHtml,
+    html_message:  mensajeHtml,
+    curso:         '✅ CORREO DE PRUEBA',
+    profesor:      cfg.schoolName,
+    nivel:         'Sistema de alertas',
+    horario:       ahora,
+    hora:          ahora,
+    fecha:         ahora,
+    name:          cfg.schoolName,
+    school:        cfg.schoolName,
+    colegio:       cfg.schoolName,
+    establecimiento: cfg.schoolName
+  };
+
+  showToast('📧 Enviando correo de prueba…', 2500);
+
+  function tryViaGASFallback(ejsError){
+    if(ejsError) addNotifLog(`⚠️ EmailJS: ${ejsError} — intentando GAS…`, 'warn');
+    sendTestViaGAS();
+  }
+
   if(!ejsReady){
-    showToast('⚠️ EmailJS cargando, espera…', 3000);
-    setTimeout(()=>{ if(ejsReady) testEmail(); else showToast('❌ EmailJS no pudo cargar. Revisa la consola.', 4000); }, 2000);
+    addNotifLog('⚠️ EmailJS no listo — enviando vía GAS', 'warn');
+    sendTestViaGAS();
     return;
   }
-  const params = {
-    curso:     '✅ PRUEBA — Sistema de notificaciones Taller de Computación',
-    profesor:   cfg.schoolName,
-    fecha:      new Date().toLocaleString('es-CL'),
-    mensaje:    `✅ Correo de prueba desde Taller de Computación.\n\nEstablecimiento: ${cfg.schoolName}\nCorreo configurado: ${cfg.email}\nAviso anticipado: ${cfg.minutes > 0 ? cfg.minutes + ' minutos' : 'Solo 1 min'}\n\nSi recibes este correo, el sistema funciona correctamente.\n\n🖥️ Sistema de Gestión de Laboratorio`,
-    name:       cfg.schoolName,
-    to_email:   cfg.email,
-    reply_to:   cfg.email
-  };
-  showToast('📧 Enviando correo de prueba…', 2500);
+
   emailjs.send(EJS.serviceId, EJS.templateId, params)
     .then(() => {
-      showToast('✅ ¡Correo enviado vía EmailJS! Revisa tu bandeja.', 6000);
-      addNotifLog(`✅ Prueba EmailJS enviada a ${cfg.email}`, 'ok');
+      showToast('✅ Correo de prueba enviado. Revisa tu bandeja.', 6000);
+      addNotifLog(`✅ Prueba EmailJS → ${cfg.email}`, 'ok');
       renderNotifLog();
     })
     .catch(e => {
-      const errMsg = e.status ? `${e.status}: ${e.text}` : JSON.stringify(e);
-      addNotifLog(`⚠️ EmailJS falló (${errMsg}), intentando vía GAS…`, 'warn');
-      // Fallback: enviar via GAS
-      sendTestViaGAS();
+      const errMsg = e.status ? `HTTP ${e.status}: ${e.text||''}` : String(e);
+      tryViaGASFallback(errMsg);
     });
 }
 
