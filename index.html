@@ -3,8 +3,10 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<meta name="theme-color" content="#1a56db"/>
+<meta name="theme-color" content="#1a56db" id="themeColorMeta"/>
 <title>Taller de Computación</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%231a56db'/><rect x='10' y='14' width='44' height='28' rx='4' fill='none' stroke='white' stroke-width='3.5'/><rect x='14' y='18' width='36' height='20' rx='2' fill='%23e8f0fe'/><rect x='14' y='18' width='36' height='20' rx='2' fill='%231d8cf8' opacity='.35'/><rect x='24' y='44' width='16' height='3' rx='1.5' fill='white' opacity='.8'/><rect x='18' y='49' width='28' height='3' rx='1.5' fill='white' opacity='.6'/><circle cx='32' cy='28' r='6' fill='white' opacity='.9'/><path d='M29 28 L32 25 L35 28 L32 31 Z' fill='%231a56db'/></svg>"/>
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%231a56db'/><rect x='10' y='14' width='44' height='28' rx='4' fill='none' stroke='white' stroke-width='3.5'/><rect x='14' y='18' width='36' height='20' rx='2' fill='%23e8f0fe'/><rect x='24' y='44' width='16' height='3' rx='1.5' fill='white' opacity='.8'/><rect x='18' y='49' width='28' height='3' rx='1.5' fill='white' opacity='.6'/><circle cx='32' cy='28' r='6' fill='white' opacity='.9'/></svg>"/>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
@@ -133,6 +135,117 @@ if (fbAuth) {
   --sh:0 1px 4px rgba(0,0,0,.08);--shm:0 6px 20px rgba(0,0,0,.13);
   --slot-h:62px;
 }
+
+/* ── DARK THEME ── */
+[data-theme="dark"] {
+  --blue:#4f8ef7;--blue-dk:#1a56db;--blue-lt:rgba(79,142,247,.15);--blue-tx:#93c5fd;
+  --green:#34d399;--green-lt:rgba(52,211,153,.12);--green-tx:#6ee7b7;
+  --brk-bg:rgba(52,211,153,.1);--brk-tx:#6ee7b7;--brk-bd:rgba(52,211,153,.25);
+  --red:#f87171;--red-lt:rgba(248,113,113,.12);--red-tx:#fca5a5;
+  --amber:#fbbf24;--amber-lt:rgba(251,191,36,.12);--amber-tx:#fde68a;
+  --gray:#9ca3af;--gray-lt:rgba(255,255,255,.06);--gray-bd:rgba(255,255,255,.1);
+  --slot:#1e2a3a;--slot-bd:#2d3f55;--slot-tx:#4a6080;
+  --text:#e2e8f0;--tx2:#a0aec0;--tx3:#64748b;
+  --bg:#0f1923;--card:#172030;
+  --sh:0 1px 4px rgba(0,0,0,.3);--shm:0 6px 20px rgba(0,0,0,.5);
+}
+
+[data-theme="dark"] body::before {
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(ellipse 80% 50% at 50% -5%,rgba(26,86,219,.08) 0%,transparent 70%);
+}
+
+[data-theme="dark"] .header {
+  background: linear-gradient(135deg,#0d1a2e,#1240a8) !important;
+}
+[data-theme="dark"] #authScreen {
+  background: linear-gradient(140deg,#030d26 0%,#0d2060 55%,#0f4a8f 100%) !important;
+}
+[data-theme="dark"] #portalScreen { background: #0f1923 !important; }
+[data-theme="dark"] .portal-card { background: #172030; border-color: rgba(255,255,255,.08); color: #e2e8f0; }
+[data-theme="dark"] .portal-title { color: #e2e8f0; }
+[data-theme="dark"] .portal-sub { color: #64748b; }
+[data-theme="dark"] .portal-btn-secondary { background: #1e2a3a; color: #a0aec0; }
+[data-theme="dark"] .portal-btn-secondary:hover { background: #263347; }
+[data-theme="dark"] .portal-hint { color: #4a6080; }
+[data-theme="dark"] .auth-card { background: #172030; }
+[data-theme="dark"] .auth-card h1 { color: #e2e8f0; }
+[data-theme="dark"] .auth-card p { color: #64748b; }
+[data-theme="dark"] .auth-tabs { background: #1e2a3a; }
+[data-theme="dark"] .auth-tab.active { background: var(--blue); color: #fff; box-shadow: none; }
+[data-theme="dark"] .inp { background: #1e2a3a; border-color: rgba(255,255,255,.12); color: #e2e8f0; }
+[data-theme="dark"] .inp:focus { border-color: var(--blue); }
+[data-theme="dark"] .inp::placeholder { color: #4a6080; }
+[data-theme="dark"] .modal { background: #172030; color: #e2e8f0; }
+[data-theme="dark"] .modal h3 { color: #e2e8f0; }
+[data-theme="dark"] .fr label { color: #a0aec0; }
+[data-theme="dark"] .card { background: #172030; border-color: rgba(255,255,255,.08); }
+[data-theme="dark"] .tab:not(.ab):not(.am):not(.an):not(.aot):not(.at) { background: #172030; border-color: rgba(255,255,255,.08); color: #64748b; }
+[data-theme="dark"] .tab.at { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.1); color: #a0aec0; }
+[data-theme="dark"] .tab.an { background: rgba(251,191,36,.1); border-color: rgba(251,191,36,.3); color: #fde68a; }
+[data-theme="dark"] .tab.aot { background: rgba(139,92,246,.1); border-color: rgba(139,92,246,.25); color: #c4b5fd; }
+[data-theme="dark"] .slot { background: #1e2a3a; border-color: #2d3f55; }
+[data-theme="dark"] .slot.can-click:hover { background: #1e3358; border-color: #4f8ef7; }
+[data-theme="dark"] .slot.is-past { background: #141e2b; border-color: #1e2a3a; }
+[data-theme="dark"] .btn-ghost { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.12); color: #a0aec0; }
+[data-theme="dark"] .btn-ghost:hover { background: rgba(255,255,255,.1); }
+[data-theme="dark"] .nota-card2 { border-color: rgba(255,255,255,.1) !important; }
+[data-theme="dark"] .nota-title-inp2 { color: #e2e8f0 !important; }
+[data-theme="dark"] .nota-body2 { color: #a0aec0 !important; }
+[data-theme="dark"] .nota2-meta, [data-theme="dark"] .nota2-words { color: rgba(255,255,255,.3) !important; }
+[data-theme="dark"] .nota-title-inp2::placeholder, [data-theme="dark"] .nota-body2::placeholder { color: rgba(255,255,255,.18) !important; }
+[data-theme="dark"] .ot-item { background: #172030; border-color: rgba(255,255,255,.08); }
+[data-theme="dark"] .ot-item.ot-done { background: #131d2b; }
+[data-theme="dark"] .ot-desc { color: #a0aec0; }
+[data-theme="dark"] .ot-checkmark { background: #1e2a3a; border-color: rgba(255,255,255,.2); }
+[data-theme="dark"] .week-nav button { background: transparent; border-color: rgba(255,255,255,.1); color: #a0aec0; }
+[data-theme="dark"] .week-nav button:hover { background: rgba(255,255,255,.06); }
+[data-theme="dark"] .inp-sm { background: #1e2a3a; border-color: rgba(255,255,255,.12); color: #e2e8f0; }
+[data-theme="dark"] select option { background: #1e2a3a; color: #e2e8f0; }
+[data-theme="dark"] .notif-log { background: #131d2b; border-color: rgba(255,255,255,.08); }
+[data-theme="dark"] .gas-banner { background: linear-gradient(135deg,#0a2018,#0d2c1a); border-color: rgba(52,211,153,.25); }
+[data-theme="dark"] .gas-banner.error { background: linear-gradient(135deg,#200a0a,#2c0d0d); border-color: rgba(248,113,113,.25); }
+[data-theme="dark"] .gas-banner.warn { background: linear-gradient(135deg,#201800,#2c2000); border-color: rgba(251,191,36,.25); }
+[data-theme="dark"] .zoom-controls { background: rgba(23,32,48,.95); border-color: rgba(255,255,255,.1); }
+[data-theme="dark"] .user-dd { background: #172030; border-color: rgba(255,255,255,.1); }
+[data-theme="dark"] .ud-item:hover { background: rgba(255,255,255,.05); }
+[data-theme="dark"] .ud-sep { background: rgba(255,255,255,.08); }
+[data-theme="dark"] .ud-info { color: #64748b; border-color: rgba(255,255,255,.08); }
+[data-theme="dark"] #notaSearch { background: #1e2a3a !important; border-color: rgba(255,255,255,.12) !important; color: #e2e8f0 !important; }
+
+/* Smooth transitions */
+*, *::before, *::after {
+  transition-property: background-color, border-color, color, box-shadow;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
+}
+button, input, select, textarea { transition-duration: 0.1s; }
+
+/* Theme toggle button */
+.theme-toggle {
+  background: rgba(255,255,255,.14);
+  border: 1px solid rgba(255,255,255,.24);
+  color: #fff;
+  border-radius: var(--rs);
+  padding: 7px 10px;
+  font-size: 16px;
+  cursor: pointer;
+  line-height: 1;
+  transition: background .15s;
+  display: flex;align-items:center;gap:5px;
+}
+.theme-toggle:hover { background: rgba(255,255,255,.26); }
+
+/* Copy button for notes */
+.nota-copy-btn {
+  background: none; border: none; cursor: pointer;
+  color: rgba(0,0,0,.3); font-size: 13px; padding: 2px 5px;
+  border-radius: 5px; transition: all .15s; line-height: 1;
+}
+.nota-copy-btn:hover { background: rgba(0,0,0,.08); color: rgba(0,0,0,.65); }
+.nota-copy-btn.copied { color: #059669 !important; }
+[data-theme="dark"] .nota-copy-btn { color: rgba(255,255,255,.25); }
+[data-theme="dark"] .nota-copy-btn:hover { background: rgba(255,255,255,.08); color: rgba(255,255,255,.7); }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 body{font-family:'DM Sans',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:15px;}
 button,input,select{font-family:inherit;}
@@ -1028,6 +1141,7 @@ function renderMain(){
         </span>
         <button class="hdr-btn" onclick="exportPDF()">📄 PDF</button>
         <button class="hdr-btn" onclick="printWeek()" title="Imprimir semana">🖨️</button>
+        <button class="theme-toggle" onclick="toggleTheme()" id="themeToggleBtn" title="Cambiar tema">🌙</button>
         <div class="user-menu" id="userMenu">
           <div class="user-chip" onclick="toggleUD()">
             <div class="user-av">${getUserInitials()}</div>
@@ -1117,6 +1231,7 @@ function renderMain(){
     renderToday(dates);
     applyZoom();
   }
+  syncThemeButton();
   document.addEventListener('click',function od(e){
     const m=document.getElementById('userMenu');
     if(m&&!m.contains(e.target)){ const d=document.getElementById('userDD'); if(d) d.classList.remove('open'); document.removeEventListener('click',od); }
@@ -2412,6 +2527,7 @@ function renderNotas(){
             <div class="nota2-colors">
               ${NOTA_COLORS.map((c,ci)=>`<button class="nota2-color-dot ${nota.color===c||(!nota.color&&ci===0)?'sel':''}" style="background:${c};border-color:${ci===0?'#fde047':ci===1?'#86efac':ci===2?'#93c5fd':ci===3?'#d8b4fe':ci===4?'#fdba74':'#fca5a5'}" onclick="setNotaColor('${nid}','${c}')" title="${NOTA_COLOR_NAMES[ci]}"></button>`).join('')}
             </div>
+            <button class="nota-copy-btn" onclick="copyNota('${nid}')" title="Copiar nota">⎘</button>
             <button class="nota-del" onclick="deleteNota('${nid}')" title="Eliminar">🗑️</button>
           </div>
           <input class="nota-title-inp2" placeholder="Título..." value="${esc(nota.title||'')}" oninput="scheduleNotaSave('${nid}','title',this.value)" style="background:transparent"/>
@@ -2822,6 +2938,61 @@ function exportPDF(){
   }
   doc.save(`Taller_${dStr(f)}_al_${dStr(l)}.pdf`);
   showToast('📄 PDF guardado');
+}
+
+// ══════════════════════════════════════════
+// THEME MANAGEMENT
+// ══════════════════════════════════════════
+(function initTheme(){
+  const saved = localStorage.getItem('tc3_theme') || 'light';
+  document.documentElement.setAttribute('data-theme', saved);
+  const meta = document.getElementById('themeColorMeta');
+  if(meta) meta.content = saved === 'dark' ? '#0d1a2e' : '#1a56db';
+})();
+
+function toggleTheme(){
+  const current = document.documentElement.getAttribute('data-theme') || 'light';
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('tc3_theme', next);
+  // Update meta theme-color
+  const meta = document.getElementById('themeColorMeta');
+  if(meta) meta.content = next === 'dark' ? '#0d1a2e' : '#1a56db';
+  // Update toggle button icon
+  document.querySelectorAll('#themeToggleBtn').forEach(btn => {
+    btn.textContent = next === 'dark' ? '☀️' : '🌙';
+  });
+  showToast(next === 'dark' ? '🌙 Tema oscuro activado' : '☀️ Tema claro activado', 2000);
+}
+
+function syncThemeButton(){
+  const current = document.documentElement.getAttribute('data-theme') || 'light';
+  document.querySelectorAll('#themeToggleBtn').forEach(btn => {
+    btn.textContent = current === 'dark' ? '☀️' : '🌙';
+  });
+}
+
+// ══════════════════════════════════════════
+// COPY NOTE
+// ══════════════════════════════════════════
+function copyNota(nid){
+  const nota = data.notes[nid];
+  if(!nota) return;
+  const text = [nota.title, nota.body].filter(Boolean).join('\n\n').trim();
+  if(!text){ showToast('La nota está vacía', 1500); return; }
+  navigator.clipboard.writeText(text).then(()=>{
+    const btn = document.querySelector(`#nota_${nid} .nota-copy-btn`);
+    if(btn){ btn.classList.add('copied'); btn.textContent='✓'; setTimeout(()=>{ btn.classList.remove('copied'); btn.textContent='⎘'; },1800); }
+    showToast('📋 Nota copiada', 1800);
+  }).catch(()=>{
+    // Fallback for non-https
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('📋 Nota copiada', 1800);
+  });
 }
 
 // ══════════════════════════════════════════
