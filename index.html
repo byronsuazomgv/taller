@@ -641,6 +641,13 @@ button,input,select{font-family:inherit;}
       <div class="fr"><label>Profesor a cargo</label>
         <input class="inp" id="bTeacher" placeholder="Nombre del profesor (opcional)"/>
       </div>
+      <div class="fr" id="oneHourRow">
+        <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;font-weight:600;color:var(--tx2)">
+          <input type="checkbox" id="bOneHour" style="width:16px;height:16px;cursor:pointer"/>
+          ⏱️ Solo 1 hora (1 bloque)
+        </label>
+        <div style="font-size:10.5px;color:var(--tx3);margin-top:5px">Si NO marcas esto, se reservan automáticamente <b>2 bloques seguidos</b> (2 horas). Márcalo si la clase dura solo 1 bloque.</div>
+      </div>
       <div class="fr" id="repeatRow">
         <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;font-weight:600;color:var(--tx2)">
           <input type="checkbox" id="bRepeat" onchange="toggleRepeatWeeksInput()" style="width:16px;height:16px;cursor:pointer"/>
@@ -1196,6 +1203,11 @@ function generateBookingId(){
   if(typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
   return 'bk_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,10);
 }
+// Busca el siguiente bloque que no sea recreo/almuerzo dentro de un arreglo de bloques
+function findNextBlockIndex(blocksArr, bi){
+  for(let i=bi+1;i<blocksArr.length;i++){ if(!blocksArr[i].isBreak) return i; }
+  return -1;
+}
 function getBlocks(level){ return level==='basica'?cfg.blocksBasica:cfg.blocksMedia; }
 function isPastSlot(d,bi,level){
   const bl=getBlocks(level)[bi]; if(!bl||bl.isBreak) return false;
@@ -1745,6 +1757,10 @@ function openWEBook(ds, bi, level, editMode){
   const repeatWeeksInp=document.getElementById('bRepeatWeeks');
   if(repeatWeeksInp) repeatWeeksInp.value=4;
   toggleRepeatWeeksInput();
+  const oneHourRow=document.getElementById('oneHourRow');
+  if(oneHourRow) oneHourRow.style.display=editMode?'none':'';
+  const oneHourChk=document.getElementById('bOneHour');
+  if(oneHourChk) oneHourChk.checked=false;
   document.getElementById('bookModal').classList.add('open');
   setTimeout(()=>document.getElementById('bCourse').focus(),100);
 }
@@ -1795,6 +1811,10 @@ function openBook(ds,bi,level,editMode){
   const repeatWeeksInp=document.getElementById('bRepeatWeeks');
   if(repeatWeeksInp) repeatWeeksInp.value=4;
   toggleRepeatWeeksInput();
+  const oneHourRow=document.getElementById('oneHourRow');
+  if(oneHourRow) oneHourRow.style.display=editMode?'none':'';
+  const oneHourChk=document.getElementById('bOneHour');
+  if(oneHourChk) oneHourChk.checked=false;
   document.getElementById('bookModal').classList.add('open');
   setTimeout(()=>document.getElementById('bCourse').focus(),100);
 }
@@ -1815,6 +1835,24 @@ function saveBook(){
     }
     data.bookings[k]={course,level:newLevel,teacher:document.getElementById('bTeacher').value.trim(),ds,bi,prefix:newLevel==='basica'?'wb':'wm',startTime:bl.start,endTime:bl.end,isWE:true,_id:editMode&&data.bookings[k]?data.bookings[k]._id:generateBookingId()};
 
+    const oneHourOnlyWE = !!document.getElementById('bOneHour')?.checked;
+    let secondBlockOkWE=false, secondBlockFailReasonWE='';
+    if(!editMode && !oneHourOnlyWE){
+      const nbi = findNextBlockIndex(getWEBlocks(newLevel), bi);
+      if(nbi===-1){
+        secondBlockFailReasonWE='no hay un bloque siguiente disponible';
+      } else {
+        const nKey=weSlotKey(ds,newLevel,nbi);
+        if(data.bookings[nKey]){
+          secondBlockFailReasonWE='el bloque siguiente ya estaba ocupado';
+        } else {
+          const nBlk=getWEBlocks(newLevel)[nbi];
+          data.bookings[nKey]={course,level:newLevel,teacher:document.getElementById('bTeacher').value.trim(),ds,bi:nbi,prefix:newLevel==='basica'?'wb':'wm',startTime:nBlk.start,endTime:nBlk.end,isWE:true,_id:generateBookingId()};
+          secondBlockOkWE=true;
+        }
+      }
+    }
+
     let repeatCount=0, repeatSkipped=0;
     if(!editMode){
       const repeatChecked = document.getElementById('bRepeat')?.checked;
@@ -1822,6 +1860,11 @@ function saveBook(){
       if(repeatChecked && weeksTotal > 1){
         const seriesId = generateBookingId();
         data.bookings[k]._seriesId = seriesId;
+        if(secondBlockOkWE){
+          const nbi0 = findNextBlockIndex(getWEBlocks(newLevel), bi);
+          const nKey0 = weSlotKey(ds, newLevel, nbi0);
+          if(data.bookings[nKey0]) data.bookings[nKey0]._seriesId = seriesId;
+        }
         for(let w=1; w<weeksTotal; w++){
           const newDs  = addDaysToDs(ds, 7*w);
           const newKey = weSlotKey(newDs, newLevel, bi);
@@ -1830,17 +1873,31 @@ function saveBook(){
           if(data.bookings[newKey]){ repeatSkipped++; continue; }
           data.bookings[newKey]={course,level:newLevel,teacher:document.getElementById('bTeacher').value.trim(),ds:newDs,bi,prefix:newLevel==='basica'?'wb':'wm',startTime:bl.start,endTime:bl.end,isWE:true,_id:generateBookingId(),_seriesId:seriesId};
           repeatCount++;
+          if(!oneHourOnlyWE){
+            const nbiW = findNextBlockIndex(getWEBlocks(newLevel), bi);
+            if(nbiW!==-1){
+              const nKeyW=weSlotKey(newDs,newLevel,nbiW);
+              if(!data.bookings[nKeyW]){
+                const nBlkW=getWEBlocks(newLevel)[nbiW];
+                data.bookings[nKeyW]={course,level:newLevel,teacher:document.getElementById('bTeacher').value.trim(),ds:newDs,bi:nbiW,prefix:newLevel==='basica'?'wb':'wm',startTime:nBlkW.start,endTime:nBlkW.end,isWE:true,_id:generateBookingId(),_seriesId:seriesId};
+              }
+            }
+          }
         }
       }
     }
 
     saveData(); closeBook(); renderMain();
     let msgWE = editMode?'✓ Reserva FDS actualizada':'✓ Clase FDS agendada';
-    if(!editMode && repeatCount>0){
-      msgWE += ` + ${repeatCount} semana${repeatCount!==1?'s':''} más`;
-      if(repeatSkipped>0) msgWE += ` (${repeatSkipped} ya ocupada${repeatSkipped!==1?'s':''}, se saltó)`;
+    if(!editMode){
+      if(secondBlockOkWE) msgWE += ' (2 horas)';
+      else if(!oneHourOnlyWE && secondBlockFailReasonWE) msgWE += ` — solo 1 hora (${secondBlockFailReasonWE})`;
+      if(repeatCount>0){
+        msgWE += ` + ${repeatCount} semana${repeatCount!==1?'s':''} más`;
+        if(repeatSkipped>0) msgWE += ` (${repeatSkipped} ya ocupada${repeatSkipped!==1?'s':''}, se saltó)`;
+      }
     }
-    showToast(msgWE, 4000);
+    showToast(msgWE, 4500);
     syncToGAS();
     setTimeout(checkPendingNotifs, 500);
     return;
@@ -1858,6 +1915,27 @@ function saveBook(){
   }
   data.bookings[key]={course,level:newLevel,teacher:document.getElementById('bTeacher').value.trim(),ds,bi,prefix,startTime:blk.start,endTime:blk.end,_id:editMode&&data.bookings[key]?data.bookings[key]._id:generateBookingId()};
 
+  // ── 1 hora vs 2 horas ──
+  // Si el check "Solo 1 hora" NO está marcado, se reserva automáticamente
+  // también el bloque siguiente (2 horas seguidas), si está libre.
+  const oneHourOnly = !!document.getElementById('bOneHour')?.checked;
+  let secondBlockOk=false, secondBlockFailReason='';
+  if(!editMode && !oneHourOnly){
+    const nbi = findNextBlockIndex(getBlocks(newLevel), bi);
+    if(nbi===-1){
+      secondBlockFailReason='no hay un bloque siguiente disponible';
+    } else {
+      const nKey=slotKey(ds,prefix,nbi);
+      if(data.bookings[nKey]){
+        secondBlockFailReason='el bloque siguiente ya estaba ocupado';
+      } else {
+        const nBlk=getBlocks(newLevel)[nbi];
+        data.bookings[nKey]={course,level:newLevel,teacher:document.getElementById('bTeacher').value.trim(),ds,bi:nbi,prefix,startTime:nBlk.start,endTime:nBlk.end,_id:generateBookingId()};
+        secondBlockOk=true;
+      }
+    }
+  }
+
   let repeatCount=0, repeatSkipped=0;
   if(!editMode){
     const repeatChecked = document.getElementById('bRepeat')?.checked;
@@ -1868,6 +1946,11 @@ function saveBook(){
       // en ninguna parte de la interfaz.
       const seriesId = generateBookingId();
       data.bookings[key]._seriesId = seriesId;
+      if(secondBlockOk){
+        const nbi0 = findNextBlockIndex(getBlocks(newLevel), bi);
+        const nKey0 = slotKey(ds, prefix, nbi0);
+        if(data.bookings[nKey0]) data.bookings[nKey0]._seriesId = seriesId;
+      }
       for(let w=1; w<weeksTotal; w++){
         const newDs  = addDaysToDs(ds, 7*w);
         const newKey = slotKey(newDs, prefix, bi);
@@ -1877,17 +1960,31 @@ function saveBook(){
         if(data.bookings[newKey]){ repeatSkipped++; continue; }
         data.bookings[newKey]={course,level:newLevel,teacher:document.getElementById('bTeacher').value.trim(),ds:newDs,bi,prefix,startTime:blk.start,endTime:blk.end,_id:generateBookingId(),_seriesId:seriesId};
         repeatCount++;
+        if(!oneHourOnly){
+          const nbiW = findNextBlockIndex(getBlocks(newLevel), bi);
+          if(nbiW!==-1){
+            const nKeyW=slotKey(newDs,prefix,nbiW);
+            if(!data.bookings[nKeyW]){
+              const nBlkW=getBlocks(newLevel)[nbiW];
+              data.bookings[nKeyW]={course,level:newLevel,teacher:document.getElementById('bTeacher').value.trim(),ds:newDs,bi:nbiW,prefix,startTime:nBlkW.start,endTime:nBlkW.end,_id:generateBookingId(),_seriesId:seriesId};
+            }
+          }
+        }
       }
     }
   }
 
   saveData(); closeBook(); renderMain();
   let msg = editMode?'✓ Reserva actualizada':'✓ Clase agendada';
-  if(!editMode && repeatCount>0){
-    msg += ` + ${repeatCount} semana${repeatCount!==1?'s':''} más`;
-    if(repeatSkipped>0) msg += ` (${repeatSkipped} ya ocupada${repeatSkipped!==1?'s':''}, se saltó)`;
+  if(!editMode){
+    if(secondBlockOk) msg += ' (2 horas)';
+    else if(!oneHourOnly && secondBlockFailReason) msg += ` — solo 1 hora (${secondBlockFailReason})`;
+    if(repeatCount>0){
+      msg += ` + ${repeatCount} semana${repeatCount!==1?'s':''} más`;
+      if(repeatSkipped>0) msg += ` (${repeatSkipped} ya ocupada${repeatSkipped!==1?'s':''}, se saltó)`;
+    }
   }
-  showToast(msg, 4000);
+  showToast(msg, 4500);
   syncToGAS();
   // Resetear notificaciones para esta reserva nueva
   if(!editMode){
