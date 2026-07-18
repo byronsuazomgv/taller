@@ -15,7 +15,7 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, getDocs }
+import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, getDocs, query, orderBy, limit, deleteDoc }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 const firebaseConfig = {
@@ -40,7 +40,7 @@ try {
 }
 
 window._fb = {
-  fns: { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, doc, setDoc, getDoc, onSnapshot, collection, getDocs },
+  fns: { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, doc, setDoc, getDoc, onSnapshot, collection, getDocs, query, orderBy, limit, deleteDoc },
   auth: fbAuth, db: fbDb
 };
 
@@ -678,6 +678,45 @@ window._appMounted  = null;
 const LS  = k => { try{ return localStorage.getItem('tc3_'+k); }catch(e){ return null; } };
 const LSS = (k,v) => { try{ localStorage.setItem('tc3_'+k, typeof v==='string'?v:JSON.stringify(v)); }catch(e){} };
 
+// ══════════════════════════════════════════
+// PROTECCIÓN CONTRA PÉRDIDA DE DATOS EN MÚLTIPLES DISPOSITIVOS
+// ══════════════════════════════════════════
+// Antes de guardar en la nube, se combinan los datos remotos con los locales
+// clave por clave, en vez de reemplazar todo el documento entero.
+// Además se llevan "tumbas" (deletedKeys) de qué se eliminó localmente,
+// para que una eliminación hecha en un dispositivo no reaparezca por venir
+// de otro dispositivo que todavía tenía esa clave.
+function loadDeletedKeys(){
+  try{
+    const raw = localStorage.getItem('tc3_deleted');
+    if(raw) return JSON.parse(raw);
+  }catch(e){}
+  return { bookings:{}, tickets:{}, notes:{}, ots:{} };
+}
+window._deletedKeys = loadDeletedKeys();
+function saveDeletedKeysToLS(){
+  try{ localStorage.setItem('tc3_deleted', JSON.stringify(window._deletedKeys)); }catch(e){}
+}
+function markDeleted(kind, key){
+  if(!window._deletedKeys[kind]) window._deletedKeys[kind]={};
+  window._deletedKeys[kind][key]=Date.now();
+  saveDeletedKeysToLS();
+}
+function mergeCollection(kind, localObj, remoteObj){
+  const merged = Object.assign({}, remoteObj||{}, localObj||{});
+  const deletedMap = window._deletedKeys[kind] || {};
+  const now = Date.now();
+  const SEVEN_DAYS = 7*24*60*60*1000;
+  Object.keys(deletedMap).forEach(k=>{
+    if(now - deletedMap[k] < SEVEN_DAYS){
+      delete merged[k];
+    } else {
+      delete deletedMap[k]; // vencida, ya no hace falta recordarla
+    }
+  });
+  return merged;
+}
+
 // Log de notificaciones
 window._notifLog = [];
 function addNotifLog(msg, type='ok'){
@@ -804,9 +843,10 @@ function saveData(){
   LSS('notified',data.notified);
   LSS('notes',data.notes);
   LSS('ots',data.ots);
+  markBackupDirty();
   cloudSave();
 }
-function saveCfg(){ window._appCfg=cfg; LSS('cfg',cfg); cloudSave(); }
+function saveCfg(){ window._appCfg=cfg; LSS('cfg',cfg); markBackupDirty(); cloudSave(); }
 
 let _saveTimer=null;
 function cloudSave(){
@@ -815,6 +855,27 @@ function cloudSave(){
   clearTimeout(_saveTimer);
   _saveTimer=setTimeout(async()=>{
     try{
+      // ── Fusión segura: traer lo más reciente de la nube y combinarlo ──
+      // con los cambios locales ANTES de sobrescribir el documento completo.
+      // Esto evita que una pestaña/dispositivo con datos desactualizados
+      // borre lo que se agregó desde otro dispositivo.
+      if(window._fb && window._fb.db && window._fb.fns && window._currentUser){
+        try{
+          const ref = window._fb.fns.doc(window._fb.db, 'users', window._currentUser.uid, 'data', 'main');
+          const snap = await window._fb.fns.getDoc(ref);
+          const remote = (snap && snap.exists()) ? snap.data() : {};
+          data.bookings = mergeCollection('bookings', data.bookings, remote.bookings);
+          data.tickets  = mergeCollection('tickets',  data.tickets,  remote.tickets);
+          data.notes    = mergeCollection('notes',    data.notes,    remote.notes);
+          data.ots      = mergeCollection('ots',      data.ots,      remote.ots);
+          LSS('bookings', data.bookings);
+          LSS('tickets',  data.tickets);
+          LSS('notes',    data.notes);
+          LSS('ots',      data.ots);
+        }catch(mergeErr){
+          console.warn('No se pudo fusionar con la nube antes de guardar (se guardará solo lo local):', mergeErr);
+        }
+      }
       window._appData=data; window._appCfg=cfg;
       window._lastSave=Date.now();
       if(window.saveToCloud) await window.saveToCloud(window._currentUser.uid);
@@ -827,6 +888,140 @@ function setSyncStatus(s){
   if(s==='ok') { el.className='sync-badge s-ok';  el.innerHTML='☁️ Sincronizado'; }
   if(s==='ing'){ el.className='sync-badge s-ing'; el.innerHTML='↻ Guardando…'; }
   if(s==='off'){ el.className='sync-badge s-off'; el.innerHTML='⚡ Solo local'; }
+}
+
+// ══════════════════════════════════════════
+// RESPALDOS AUTOMÁTICOS EN LA NUBE (historial de versiones)
+// ══════════════════════════════════════════
+// Cada vez que se abre la app (y ya pasaron 12h desde el último), se guarda
+// una copia completa con fecha/hora en users/{uid}/backups/{timestamp}.
+// Se conservan solo las últimas 14 versiones (se borran las más viejas).
+// Marca/lee si hay cambios pendientes de respaldar (para no crear
+// una versión nueva si nada cambió realmente desde la última vez)
+function markBackupDirty(){
+  if(window._guestMode || !window._currentUser) return;
+  try{ localStorage.setItem('tc3_backupDirty_' + window._currentUser.uid, '1'); }catch(e){}
+}
+function clearBackupDirty(){
+  if(!window._currentUser) return;
+  try{ localStorage.setItem('tc3_backupDirty_' + window._currentUser.uid, '0'); }catch(e){}
+}
+function isBackupDirty(){
+  if(!window._currentUser) return false;
+  try{
+    const v = localStorage.getItem('tc3_backupDirty_' + window._currentUser.uid);
+    // Si nunca se ha registrado (primera vez), se considera "con cambios"
+    // para que quede al menos una versión inicial guardada.
+    return v === null || v === '1';
+  }catch(e){ return true; }
+}
+
+async function maybeAutoBackup(){
+  if(window._guestMode || !window._currentUser) return;
+  try{
+    if(!isBackupDirty()) return; // nada nuevo que respaldar — no crear versión vacía
+    const key = 'tc3_lastAutoBackup_' + window._currentUser.uid;
+    const last = parseInt(localStorage.getItem(key) || '0');
+    if(Date.now() - last < 60*60*1000) return; // máx. 1 respaldo por hora, para agrupar varios cambios seguidos
+    await runAutoBackup();
+    localStorage.setItem(key, String(Date.now()));
+    clearBackupDirty();
+  }catch(e){ console.warn('Respaldo automático falló:', e); }
+}
+
+async function runAutoBackup(){
+  if(!window._fb || !window._fb.db || !window._fb.fns || !window._currentUser) return;
+  const { doc:_doc, setDoc:_setDoc, collection:_col, getDocs:_getDocs, query:_query, orderBy:_orderBy, limit:_limit, deleteDoc:_delDoc } = window._fb.fns;
+  const uid = window._currentUser.uid;
+  const snapshot = {
+    cfg: cfg || null,
+    bookings: data.bookings || {},
+    tickets:  data.tickets  || {},
+    notes:    data.notes    || {},
+    ots:      data.ots      || {},
+    notified: data.notified || {},
+    createdAt: Date.now(),
+    createdAtLegible: new Date().toLocaleString('es-CL')
+  };
+  const backupId = String(Date.now());
+  try{
+    const ref = _doc(window._fb.db, 'users', uid, 'backups', backupId);
+    await _setDoc(ref, snapshot);
+    addNotifLog('🕰️ Respaldo automático guardado en la nube', 'ok');
+  }catch(e){ console.warn('No se pudo guardar el respaldo automático:', e); return; }
+
+  // Rotación: conservar solo las últimas 14 versiones
+  try{
+    const colRef = _col(window._fb.db, 'users', uid, 'backups');
+    const qy = _query(colRef, _orderBy('createdAt','desc'), _limit(50));
+    const snaps = await _getDocs(qy);
+    const docs=[]; snaps.forEach(s=>docs.push(s));
+    const KEEP=14;
+    if(docs.length>KEEP){
+      for(const d of docs.slice(KEEP)){ await _delDoc(d.ref); }
+    }
+  }catch(e){ console.warn('No se pudieron rotar respaldos antiguos:', e); }
+}
+
+async function loadAutoBackupsList(){
+  const cont=document.getElementById('autoBackupsList'); if(!cont) return;
+  if(window._guestMode || !window._currentUser){
+    cont.innerHTML='<div style="font-size:12px;color:var(--tx3)">Disponible solo si usas cuenta (no en modo local).</div>';
+    return;
+  }
+  cont.innerHTML='<div style="font-size:12px;color:var(--tx3)">Cargando…</div>';
+  try{
+    const { collection:_col, getDocs:_getDocs, query:_query, orderBy:_orderBy, limit:_limit } = window._fb.fns;
+    const uid=window._currentUser.uid;
+    const colRef=_col(window._fb.db, 'users', uid, 'backups');
+    const qy=_query(colRef, _orderBy('createdAt','desc'), _limit(14));
+    const snaps=await _getDocs(qy);
+    const items=[]; snaps.forEach(s=>items.push({id:s.id, data:s.data()}));
+    if(!items.length){
+      cont.innerHTML='<div style="font-size:12px;color:var(--tx3)">Aún no hay respaldos automáticos. Se crea uno solo cada vez que abres la app (máximo cada 12 h).</div>';
+      return;
+    }
+    cont.innerHTML=items.map(it=>{
+      const d=it.data;
+      const label=d.createdAtLegible||new Date(d.createdAt).toLocaleString('es-CL');
+      const nRes=Object.keys(d.bookings||{}).length;
+      return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--gray-bd);border-radius:8px;margin-bottom:6px">
+        <div>
+          <div style="font-size:12px;font-weight:600;color:var(--text)">${esc(label)}</div>
+          <div style="font-size:11px;color:var(--tx3)">${nRes} reserva${nRes!==1?'s':''} guardada${nRes!==1?'s':''}</div>
+        </div>
+        <button class="btn-ghost" style="padding:5px 10px;font-size:11px" onclick="restoreAutoBackup('${it.id}')">↩️ Restaurar</button>
+      </div>`;
+    }).join('');
+  }catch(e){
+    cont.innerHTML='<div style="font-size:12px;color:var(--red-tx)">No se pudo cargar la lista de respaldos.</div>';
+    console.error(e);
+  }
+}
+
+async function restoreAutoBackup(backupId){
+  if(!confirm('¿Restaurar esta versión? Reemplazará TODOS los datos actuales (reservas, tickets, notas, OT) por los de este respaldo.\n\nEsta acción no se puede deshacer.')) return;
+  try{
+    const { doc:_doc, getDoc:_getDoc } = window._fb.fns;
+    const uid=window._currentUser.uid;
+    const ref=_doc(window._fb.db, 'users', uid, 'backups', backupId);
+    const snap=await _getDoc(ref);
+    if(!snap.exists()){ showToast('❌ Ese respaldo ya no existe'); return; }
+    const b=snap.data();
+    if(b.cfg) cfg=b.cfg;
+    data.bookings=b.bookings||{};
+    data.tickets =b.tickets ||{};
+    data.notes   =b.notes   ||{};
+    data.ots     =b.ots     ||{};
+    data.notified=b.notified||{};
+    saveCfg(); saveData();
+    showToast('✅ Versión restaurada correctamente');
+    addNotifLog('↩️ Restaurado un respaldo automático', 'warn');
+    renderCfg();
+  }catch(e){
+    showToast('❌ No se pudo restaurar ese respaldo');
+    console.error(e);
+  }
 }
 
 // ══════════════════════════════════════════
@@ -881,6 +1076,9 @@ window.showApp=function(){
   requestNotifPermission();
   // Sincronizar GAS con los bookings actuales al iniciar
   setTimeout(() => syncToGAS(), 3000);
+  // Respaldo automático silencioso — solo si hubo cambios reales (máx. 1 por hora)
+  setTimeout(() => maybeAutoBackup(), 5000);
+  setInterval(() => { if(!window._guestMode) maybeAutoBackup(); }, 30*60*1000);
 };
 
 window.addEventListener('load',()=>{
@@ -1515,6 +1713,7 @@ function openWEBook(ds, bi, level, editMode){
 }
 function removeWEBk(k){
   if(!confirm('¿Eliminar esta reserva de fin de semana?')) return;
+  markDeleted('bookings', k); markDeleted('tickets', k);
   delete data.bookings[k]; delete data.tickets[k];
   Object.keys(data.notified).forEach(nk=>{ if(nk.startsWith(k)) delete data.notified[nk]; });
   saveData(); renderMain(); showToast('Reserva eliminada');
@@ -1566,6 +1765,7 @@ function saveBook(){
     const k=weSlotKey(ds,newLevel,bi);
     const bl=getWEBlocks(newLevel)[bi]||getWEBlocks(level)[bi];
     if(editMode && editKey && editKey!==k){
+      markDeleted('bookings', editKey); markDeleted('tickets', editKey);
       delete data.bookings[editKey]; delete data.tickets[editKey];
       Object.keys(data.notified).forEach(nk=>{ if(nk.startsWith(editKey)) delete data.notified[nk]; });
     }
@@ -1583,6 +1783,7 @@ function saveBook(){
   const key=slotKey(ds,prefix,bi);
   const blk=getBlocks(newLevel)[bi]||getBlocks(level)[bi];
   if(editMode && editKey && editKey!==key){
+    markDeleted('bookings', editKey); markDeleted('tickets', editKey);
     delete data.bookings[editKey]; delete data.tickets[editKey];
     Object.keys(data.notified).forEach(nk=>{ if(nk.startsWith(editKey)) delete data.notified[nk]; });
   }
@@ -1603,6 +1804,7 @@ function deleteFromModal(){
     if(!editKey) return;
     if(!confirm('¿Eliminar esta reserva?')) return;
     closeBook();
+    markDeleted('bookings', editKey); markDeleted('tickets', editKey);
     delete data.bookings[editKey]; delete data.tickets[editKey];
     Object.keys(data.notified).forEach(nk=>{ if(nk.startsWith(editKey)) delete data.notified[nk]; });
     saveData(); renderMain(); showToast('🗑️ Reserva eliminada');
@@ -1612,6 +1814,7 @@ function deleteFromModal(){
   if(!editKey) return;
   if(!confirm('¿Eliminar esta reserva?')) return;
   closeBook();
+  markDeleted('bookings', editKey); markDeleted('tickets', editKey);
   delete data.bookings[editKey]; delete data.tickets[editKey];
   Object.keys(data.notified).forEach(nk=>{ if(nk.startsWith(editKey)) delete data.notified[nk]; });
   saveData(); renderMain(); showToast('🗑️ Reserva eliminada');
@@ -1678,7 +1881,34 @@ function renderCfg(){
     <div class="card">
       <div class="cfg-title" style="margin-top:0">👤 Cuenta</div>
       <div style="font-size:13px;color:var(--tx2);margin-bottom:4px">Correo de cuenta: <b>${esc(userEmail||'—')}</b></div>
+      <div style="font-size:11px;color:var(--tx3);background:var(--gray-lt);border-radius:8px;padding:8px 10px;margin-top:8px;line-height:1.6">
+        ⚠️ Si abres esta cuenta en varios navegadores/computadores a la vez, evita editar en dos lugares simultáneamente y espera a ver "☁️ Sincronizado" antes de cerrar la pestaña.
+      </div>
     </div>
+
+    <div class="card" style="border-color:#86efac">
+      <div class="cfg-title" style="margin-top:0;color:var(--green-tx)">🕰️ Respaldos automáticos (nube)</div>
+      <div style="font-size:12px;color:var(--tx3);margin-bottom:10px;line-height:1.6">
+        La app guarda automáticamente una copia completa en tu cuenta <b>solo cuando hay cambios reales</b> (agendar, borrar, marcar asistencia, notas, OT), con un máximo de una versión nueva por hora — para no crear copias vacías o innecesarias. Se conservan las últimas 14 versiones, cada una con su fecha y hora exactas. Si algo se pierde, puedes volver a una versión anterior aquí:
+      </div>
+      <div id="autoBackupsList" style="margin-bottom:8px"></div>
+      <button class="btn-ghost" style="padding:6px 12px;font-size:12px" onclick="loadAutoBackupsList()">🔄 Actualizar lista</button>
+    </div>
+
+    <div class="card" style="border-color:#93c5fd">
+      <div class="cfg-title" style="margin-top:0;color:var(--blue-tx)">💾 Respaldo manual (archivo)</div>
+      <div style="font-size:12px;color:var(--tx3);margin-bottom:10px;line-height:1.6">
+        Además del respaldo automático, puedes descargar una copia a un archivo propio (por ejemplo antes de un cambio grande, o para guardar fuera de la nube).
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button class="btn btn-blue" style="padding:8px 16px;font-size:13px" onclick="exportBackup()">⬇️ Descargar respaldo</button>
+        <label class="btn-ghost" style="padding:8px 16px;font-size:13px;cursor:pointer">
+          ⬆️ Restaurar desde archivo
+          <input type="file" accept="application/json" style="display:none" onchange="if(this.files[0]) importBackupFile(this.files[0])"/>
+        </label>
+      </div>
+    </div>
+
     <div class="card">
       <div class="cfg-title" style="margin-top:0">Establecimiento</div>
       <div class="fr"><label>Nombre del establecimiento</label><input class="inp" id="c_school" value="${esc(cfg.schoolName)}"/></div>
@@ -1771,6 +2001,8 @@ function renderCfg(){
   renderNotifLog();
   // Verificar GAS al abrir config
   setTimeout(testGASConnection, 500);
+  // Cargar lista de respaldos automáticos
+  setTimeout(loadAutoBackupsList, 300);
 }
 function renderCBlocks(lv){
   const arr=lv==='basica'?cfg.blocksBasica:cfg.blocksMedia;
@@ -1807,10 +2039,71 @@ function resetNotified(){
 
 function resetTickets(){
   if(!confirm('¿Limpiar TODOS los tickets de asistencia (✓/✕)? Esto no borra las reservas, solo el estado de asistencia.')) return;
+  Object.keys(data.tickets).forEach(k=>markDeleted('tickets', k));
   data.tickets = {};
   saveData();
   renderMain();
   showToast('🗑️ Tickets de asistencia limpiados.');
+}
+
+// ══════════════════════════════════════════
+// RESPALDO MANUAL (exportar / importar)
+// ══════════════════════════════════════════
+function exportBackup(){
+  const backup = {
+    tipo: 'respaldo_taller_computacion',
+    version: 1,
+    exportedAt: Date.now(),
+    exportedAtLegible: new Date().toLocaleString('es-CL'),
+    cfg,
+    bookings: data.bookings || {},
+    tickets:  data.tickets  || {},
+    notes:    data.notes    || {},
+    ots:      data.ots      || {},
+    notified: data.notified || {}
+  };
+  try{
+    const blob = new Blob([JSON.stringify(backup, null, 2)], {type:'application/json'});
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    const fecha = dStr(new Date());
+    a.href = url;
+    a.download = `respaldo_taller_${fecha}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('💾 Respaldo descargado — guárdalo en un lugar seguro');
+    addNotifLog('💾 Respaldo manual exportado', 'ok');
+  }catch(e){
+    showToast('❌ No se pudo generar el respaldo');
+    console.error(e);
+  }
+}
+
+function importBackupFile(file){
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    let b;
+    try{ b = JSON.parse(e.target.result); }
+    catch(err){ showToast('❌ Archivo de respaldo inválido o dañado'); return; }
+    if(!b || (typeof b !== 'object')){ showToast('❌ Archivo de respaldo inválido'); return; }
+    const resumen = `Reservas: ${Object.keys(b.bookings||{}).length} · Notas: ${Object.keys(b.notes||{}).length} · OT: ${Object.keys(b.ots||{}).length}`;
+    if(!confirm(`¿Reemplazar TODOS los datos actuales con este respaldo?\n\n${resumen}\n\nEsta acción no se puede deshacer.`)) return;
+    if(b.cfg) cfg = b.cfg;
+    data.bookings = b.bookings || {};
+    data.tickets  = b.tickets  || {};
+    data.notes    = b.notes    || {};
+    data.ots      = b.ots      || {};
+    data.notified = b.notified || {};
+    saveCfg();
+    saveData();
+    showToast('✅ Respaldo restaurado correctamente');
+    addNotifLog('⬆️ Respaldo restaurado manualmente por el usuario', 'warn');
+    renderCfg();
+  };
+  reader.onerror = () => showToast('❌ No se pudo leer el archivo');
+  reader.readAsText(file);
 }
 
 // ══════════════════════════════════════════
@@ -2611,6 +2904,7 @@ function scheduleNotaSave(nid,field,val){
 }
 function deleteNota(nid){
   if(!confirm('¿Eliminar esta nota?')) return;
+  markDeleted('notes', nid);
   delete data.notes[nid];
   saveData(); renderNotas(); showToast('Nota eliminada');
 }
@@ -2746,6 +3040,7 @@ function toggleOT(oid, checked){
 
 function deleteOT(oid){
   if(!confirm('¿Eliminar esta OT?')) return;
+  markDeleted('ots', oid);
   delete data.ots[oid];
   saveData(); renderOT(); showToast('OT eliminada');
 }
