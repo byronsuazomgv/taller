@@ -2010,13 +2010,14 @@ function saveBook(){
       }
     }
 
-    let repeatCount=0, repeatSkipped=0, repeatSkippedDates=[];
+    let repeatCount=0, repeatSkipped=0, repeatSkippedDates=[], repeatCreatedDates=[];
     if(!editMode){
       const repeatChecked = document.getElementById('bRepeat')?.checked;
       const weeksTotal = parseInt(document.getElementById('bRepeatWeeks')?.value) || 1;
       if(repeatChecked && weeksTotal > 1){
         const seriesId = generateBookingId();
         data.bookings[k]._seriesId = seriesId;
+        repeatCreatedDates.push(formatDsLong(ds) + ' (semana 1)');
         if(secondBlockOkWE){
           const nbi0 = findNextBlockIndex(getWEBlocks(newLevel), bi);
           const nKey0 = weSlotKey(ds, newLevel, nbi0);
@@ -2027,9 +2028,13 @@ function saveBook(){
           const newKey = weSlotKey(newDs, newLevel, bi);
           // Cada semana se guarda de forma independiente; eliminar una
           // reserva puntual nunca afecta a las demás semanas de la serie.
+          // Nunca se sobrescribe una reserva existente: si ya hay algo,
+          // esa semana se salta.
           if(data.bookings[newKey]){ repeatSkipped++; repeatSkippedDates.push(formatDsLong(newDs)); continue; }
           data.bookings[newKey]={course,level:newLevel,teacher:document.getElementById('bTeacher').value.trim(),ds:newDs,bi,prefix:newLevel==='basica'?'wb':'wm',startTime:bl.start,endTime:bl.end,isWE:true,_id:generateBookingId(),_seriesId:seriesId};
           repeatCount++;
+          repeatCreatedDates.push(formatDsLong(newDs) + ` (semana ${w+1})`);
+          addNotifLog(`🔁 Repetir (FDS): creada reserva "${course}" el ${formatDsLong(newDs)}`, 'ok');
           if(!oneHourOnlyWE){
             const nbiW = findNextBlockIndex(getWEBlocks(newLevel), bi);
             if(nbiW!==-1){
@@ -2054,8 +2059,11 @@ function saveBook(){
       }
     }
     showToast(msgWE, 4500);
-    if(repeatSkippedDates.length){
-      showConflictBanner(`"${course}" ya tenía una reserva en este bloque estos días — no se sobrescribió:`, repeatSkippedDates);
+    if(!editMode && (repeatCreatedDates.length>1 || repeatSkippedDates.length)){
+      const items=[];
+      if(repeatCreatedDates.length>1) items.push(...repeatCreatedDates.map(d=>`✅ Agendado: ${d}`));
+      if(repeatSkippedDates.length) items.push(...repeatSkippedDates.map(d=>`⚠️ Ya ocupado (no se tocó): ${d}`));
+      showConflictBanner(`"${course}" — resumen de la repetición:`, items);
     }
     syncToGAS();
     setTimeout(checkPendingNotifs, 500);
@@ -2095,7 +2103,7 @@ function saveBook(){
     }
   }
 
-  let repeatCount=0, repeatSkipped=0;
+  let repeatCount=0, repeatSkipped=0, repeatSkippedDates=[], repeatCreatedDates=[];
   if(!editMode){
     const repeatChecked = document.getElementById('bRepeat')?.checked;
     const weeksTotal = parseInt(document.getElementById('bRepeatWeeks')?.value) || 1;
@@ -2105,6 +2113,7 @@ function saveBook(){
       // en ninguna parte de la interfaz.
       const seriesId = generateBookingId();
       data.bookings[key]._seriesId = seriesId;
+      repeatCreatedDates.push(formatDsLong(ds) + ' (semana 1)');
       if(secondBlockOk){
         const nbi0 = findNextBlockIndex(getBlocks(newLevel), bi);
         const nKey0 = slotKey(ds, prefix, nbi0);
@@ -2115,10 +2124,14 @@ function saveBook(){
         const newKey = slotKey(newDs, prefix, bi);
         // Cada semana queda guardada de forma independiente bajo su propia
         // clave (fecha + bloque) — al eliminar una reserva puntual, solo
-        // se borra esa clave; el resto de la serie no se toca.
-        if(data.bookings[newKey]){ repeatSkipped++; continue; }
+        // se borra esa clave; el resto de la serie no se toca. Aquí NUNCA
+        // se sobrescribe ni se borra una reserva que ya exista: si el
+        // bloque ya está ocupado, esa semana simplemente se salta.
+        if(data.bookings[newKey]){ repeatSkipped++; repeatSkippedDates.push(formatDsLong(newDs)); continue; }
         data.bookings[newKey]={course,level:newLevel,teacher:document.getElementById('bTeacher').value.trim(),ds:newDs,bi,prefix,startTime:blk.start,endTime:blk.end,_id:generateBookingId(),_seriesId:seriesId};
         repeatCount++;
+        repeatCreatedDates.push(formatDsLong(newDs) + ` (semana ${w+1})`);
+        addNotifLog(`🔁 Repetir: creada reserva "${course}" el ${formatDsLong(newDs)}`, 'ok');
         if(!oneHourOnly){
           const nbiW = findNextBlockIndex(getBlocks(newLevel), bi);
           if(nbiW!==-1){
@@ -2130,6 +2143,9 @@ function saveBook(){
           }
         }
       }
+      if(repeatSkippedDates.length){
+        addNotifLog(`🔁 Repetir: "${course}" se saltó en ${repeatSkippedDates.length} semana(s) por estar ocupadas`, 'warn');
+      }
     }
   }
 
@@ -2140,10 +2156,15 @@ function saveBook(){
     else if(!oneHourOnly && secondBlockFailReason) msg += ` — solo 1 hora (${secondBlockFailReason})`;
     if(repeatCount>0){
       msg += ` + ${repeatCount} semana${repeatCount!==1?'s':''} más`;
-      if(repeatSkipped>0) msg += ` (${repeatSkipped} ya ocupada${repeatSkipped!==1?'s':''}, se saltó)`;
     }
   }
   showToast(msg, 4500);
+  if(!editMode && (repeatCreatedDates.length>1 || repeatSkippedDates.length)){
+    const items=[];
+    if(repeatCreatedDates.length>1) items.push(...repeatCreatedDates.map(d=>`✅ Agendado: ${d}`));
+    if(repeatSkippedDates.length) items.push(...repeatSkippedDates.map(d=>`⚠️ Ya ocupado (no se tocó): ${d}`));
+    showConflictBanner(`"${course}" — resumen de la repetición:`, items);
+  }
   syncToGAS();
   // Resetear notificaciones para esta reserva nueva
   if(!editMode){
