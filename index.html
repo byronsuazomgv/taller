@@ -90,6 +90,15 @@ window.loadCloudData = async function(uid) {
     window._unsubSync = onSnapshot(ref, (snap2) => {
       if (!snap2.exists()) return;
       const d2 = snap2.data();
+      // ── Cierre de sesión remoto ──
+      // Si desde OTRA pantalla se pidió "Cerrar sesión en otros dispositivos"
+      // después de que esta pestaña inició sesión, se cierra automáticamente.
+      if (d2.forceLogoutAfter && d2.forceLogoutAfter > (window._sessionStartedAt || 0)) {
+        try { if (window._unsubSync) window._unsubSync(); } catch(e) {}
+        alert('Tu sesión se cerró porque solicitaste cerrar sesión en tus otros dispositivos desde otra pantalla.');
+        signOut(fbAuth).catch(()=>{});
+        return;
+      }
       if (d2.updatedAt && d2.updatedAt > (window._lastSave || 0)) {
         if (d2.cfg)      window._appCfg = d2.cfg;
         if (d2.bookings) window._appData.bookings = d2.bookings;
@@ -111,6 +120,7 @@ if (fbAuth) {
     if (user) {
       window._currentUser = user;
       window._guestMode   = false;
+      window._sessionStartedAt = Date.now();
       document.getElementById('portalScreen').style.display='none';
       await window.loadCloudData(user.uid);
       window.showApp();
@@ -784,13 +794,25 @@ function mergeCollection(kind, localObj, remoteObj){
   const deletedMap = window._deletedKeys[kind] || {};
   const now = Date.now();
   const SEVEN_DAYS = 7*24*60*60*1000;
+  let tombstonesChanged=false;
   Object.keys(deletedMap).forEach(k=>{
+    const existsLocallyNow = localObj && Object.prototype.hasOwnProperty.call(localObj, k);
+    if(existsLocallyNow){
+      // Volviste a crear algo en esta misma clave (mismo día+bloque) después
+      // de haberla borrado — la marca de "eliminado" quedó obsoleta.
+      // Se descarta para no volver a borrar lo que acabas de crear.
+      delete deletedMap[k];
+      tombstonesChanged=true;
+      return;
+    }
     if(now - deletedMap[k] < SEVEN_DAYS){
       delete merged[k];
     } else {
       delete deletedMap[k]; // vencida, ya no hace falta recordarla
+      tombstonesChanged=true;
     }
   });
+  if(tombstonesChanged) saveDeletedKeysToLS();
   return merged;
 }
 
@@ -841,14 +863,14 @@ const DEF_M=[
 // ══════════════════════════════════════════
 let cfg  = null;
 let data = window._appData;
-let ui   = { level:'basica', weekOffset:0, pendingSlot:null, calZoom:3, weLvl:'basica' };
+let ui   = { level:'basica', weekOffset:0, pendingSlot:null, calZoom:6, weLvl:'basica' };
 let ejsReady = false;
 
 // GAS_URL: siempre usa la URL fija, ignora localStorage para no haber conflictos
 let GAS_URL = FIXED_GAS_URL;
 
 // Zoom levels — alturas de slot en px (zoom vertical puro)
-const ZOOM_HEIGHTS = [38, 50, 62, 78, 96];
+const ZOOM_HEIGHTS = [16, 22, 28, 38, 50, 62, 78, 96];
 
 function applyZoom(){
   const slotH = ZOOM_HEIGHTS[ui.calZoom - 1];
@@ -866,12 +888,12 @@ function applyZoom(){
   document.querySelectorAll('.zoom-level').forEach(el => {
     el.textContent = `${pct}%`;
   });
-  document.querySelectorAll('.zoom-btn[data-dir="in"]').forEach(b  => b.disabled = ui.calZoom >= 5);
+  document.querySelectorAll('.zoom-btn[data-dir="in"]').forEach(b  => b.disabled = ui.calZoom >= ZOOM_HEIGHTS.length);
   document.querySelectorAll('.zoom-btn[data-dir="out"]').forEach(b => b.disabled = ui.calZoom <= 1);
   try{ localStorage.setItem('tc3_zoom', ui.calZoom); }catch(e){}
 }
 
-function zoomIn()  { if(ui.calZoom < 5){ ui.calZoom++; applyZoom(); } }
+function zoomIn()  { if(ui.calZoom < ZOOM_HEIGHTS.length){ ui.calZoom++; applyZoom(); } }
 function zoomOut() { if(ui.calZoom > 1){ ui.calZoom--; applyZoom(); } }
 
 function initPinch(){
@@ -899,7 +921,7 @@ function initPinch(){
   document.addEventListener('touchend', () => { _lastDist = null; }, {passive:true});
   try{
     const saved = parseInt(localStorage.getItem('tc3_zoom'));
-    if(saved >= 1 && saved <= 5) ui.calZoom = saved;
+    if(saved >= 1 && saved <= ZOOM_HEIGHTS.length) ui.calZoom = saved;
   }catch(e){}
 }
 window.addEventListener('load', initPinch);
@@ -1212,6 +1234,30 @@ async function doLogout(){
     stopNotifEngine();
     await window._fb.fns.signOut(window._fb.auth);
   }catch(e){ console.error(e); }
+}
+
+// ── Cerrar sesión en otros dispositivos ──
+// No borra la cuenta ni sus datos: solo cierra la sesión que tengas abierta
+// en otros navegadores/computadores con la misma cuenta. Esta pantalla
+// (la que hace clic) se queda conectada.
+async function closeOtherSessions(){
+  if(window._guestMode || !window._currentUser){
+    showToast('Esto solo está disponible si usas una cuenta (no en modo local)');
+    return;
+  }
+  if(!confirm('Esto cerrará la sesión en TODOS tus otros navegadores/computadores conectados con esta cuenta (la próxima vez que hagan algo ahí).\n\nEsta pantalla seguirá conectada normalmente.\n\n¿Continuar?')) return;
+  try{
+    const ref = window._fb.fns.doc(window._fb.db, 'users', window._currentUser.uid, 'data', 'main');
+    const now = Date.now();
+    await window._fb.fns.setDoc(ref, { forceLogoutAfter: now }, { merge:true });
+    // Esta misma pestaña queda excluida del cierre, ya que ella fue la que lo pidió.
+    window._sessionStartedAt = now;
+    showToast('🔒 Se cerrará la sesión en tus otros dispositivos', 4000);
+    addNotifLog('🔒 Se solicitó cerrar sesión en otros dispositivos', 'warn');
+  }catch(e){
+    showToast('❌ No se pudo enviar la solicitud. Revisa tu conexión.');
+    console.error(e);
+  }
 }
 
 // ══════════════════════════════════════════
@@ -1593,7 +1639,7 @@ function renderMain(){
         <span>${wl}</span>
         <button onclick="changeWeek(0)" title="Ir a semana actual" style="font-size:11px;padding:5px 10px;background:var(--blue-lt);color:var(--blue-tx);border-color:#93c5fd">Hoy</button>
         <button onclick="changeWeek(1)" title="Semana siguiente (→)">Siguiente →</button>
-        <button onclick="clearWeekData()" title="Eliminar todas las reservas de esta semana" style="font-size:11px;padding:5px 10px;background:var(--red-lt);color:var(--red-tx);border-color:#fca5a5">🗑️ Limpiar semana</button>
+        <button onclick="clearWeekData()" title="Eliminar las reservas de esta semana (solo del nivel activo)" style="font-size:11px;padding:5px 10px;background:var(--red-lt);color:var(--red-tx);border-color:#fca5a5">🗑️ Limpiar semana (${ui.level==='basica'?'Básica':ui.level==='media'?'Media':'todo'})</button>
         <div class="zoom-controls">
           <button class="zoom-btn" data-dir="out" onclick="zoomOut()" title="Reducir">−</button>
           <span class="zoom-level">${Math.round((ZOOM_HEIGHTS[ui.calZoom-1]/62)*100)}%</span>
@@ -1946,20 +1992,29 @@ function clearWeekData(){
   const allDates = [...dates, ...datesWE];
   const dsSet = new Set(allDates.map(d=>dStr(d)));
 
+  // Si estás en la pestaña Básica o Media, la limpieza SOLO afecta ese
+  // nivel. Si estás en "Semana" (vista combinada), afecta ambos niveles,
+  // ya que ahí no hay un nivel único seleccionado.
+  const scopeLevel = (ui.level==='basica' || ui.level==='media') ? ui.level : null;
+  const levelLabel = scopeLevel ? (scopeLevel==='basica'?'Educación Básica':'Educación Media') : 'Básica y Media';
+
   const keysToDelete = Object.keys(data.bookings).filter(k=>{
     const bk = data.bookings[k];
-    return bk && bk.ds && dsSet.has(bk.ds);
+    if(!bk || !bk.ds || !dsSet.has(bk.ds)) return false;
+    if(scopeLevel && bk.level!==scopeLevel) return false;
+    return true;
   });
 
   const f = dates[0], l = datesWE[1];
   const wl = `${f.getDate()}/${f.getMonth()+1} al ${l.getDate()}/${l.getMonth()+1}/${l.getFullYear()}`;
 
   if(!keysToDelete.length){
-    showToast(`No hay reservas esa semana (${wl}) para limpiar`, 3000);
+    showToast(`No hay reservas de ${levelLabel} esa semana (${wl}) para limpiar`, 3000);
     return;
   }
 
-  if(!confirm(`¿Eliminar TODAS las reservas de la semana del ${wl}?\n\nSe borrarán ${keysToDelete.length} reserva${keysToDelete.length!==1?'s':''} (Básica, Media y fin de semana de esa semana puntual).\n\nEsta acción no se puede deshacer. Las demás semanas del calendario NO se ven afectadas.`)) return;
+  const otherLevelNote = scopeLevel ? `\n\n(${scopeLevel==='basica'?'Media':'Básica'} de esa misma semana NO se toca.)` : '';
+  if(!confirm(`¿Eliminar TODAS las reservas de ${levelLabel} de la semana del ${wl}?\n\nSe borrarán ${keysToDelete.length} reserva${keysToDelete.length!==1?'s':''}.\n\nEsta acción no se puede deshacer. Las demás semanas del calendario NO se ven afectadas.${otherLevelNote}`)) return;
 
   keysToDelete.forEach(k=>{
     markDeleted('bookings', k); markDeleted('tickets', k);
@@ -1969,8 +2024,8 @@ function clearWeekData(){
   });
 
   saveData(); renderMain();
-  showToast(`🗑️ Semana del ${wl} limpiada — ${keysToDelete.length} reserva${keysToDelete.length!==1?'s':''} eliminada${keysToDelete.length!==1?'s':''}`, 4500);
-  addNotifLog(`🗑️ Semana limpiada manualmente (${wl}): ${keysToDelete.length} reserva(s) eliminada(s)`, 'warn');
+  showToast(`🗑️ Semana del ${wl} (${levelLabel}) limpiada — ${keysToDelete.length} reserva${keysToDelete.length!==1?'s':''} eliminada${keysToDelete.length!==1?'s':''}`, 4500);
+  addNotifLog(`🗑️ Semana limpiada manualmente (${wl}, ${levelLabel}): ${keysToDelete.length} reserva(s) eliminada(s)`, 'warn');
   syncToGAS();
 }
 // Keyboard nav: ← → arrows when not focused on input
@@ -2298,9 +2353,13 @@ function renderCfg(){
     <div class="card">
       <div class="cfg-title" style="margin-top:0">👤 Cuenta</div>
       <div style="font-size:13px;color:var(--tx2);margin-bottom:4px">Correo de cuenta: <b>${esc(userEmail||'—')}</b></div>
-      <div style="font-size:11px;color:var(--tx3);background:var(--gray-lt);border-radius:8px;padding:8px 10px;margin-top:8px;line-height:1.6">
+      <div style="font-size:11px;color:var(--tx3);background:var(--gray-lt);border-radius:8px;padding:8px 10px;margin-top:8px;margin-bottom:12px;line-height:1.6">
         ⚠️ Si abres esta cuenta en varios navegadores/computadores a la vez, evita editar en dos lugares simultáneamente y espera a ver "☁️ Sincronizado" antes de cerrar la pestaña.
       </div>
+      ${window._guestMode?'':`
+      <button class="btn" style="background:#dc2626;color:#fff;padding:8px 16px;font-size:13px" onclick="closeOtherSessions()">🔒 Cerrar sesión en otros dispositivos</button>
+      <div style="font-size:11px;color:var(--tx3);margin-top:6px;line-height:1.6">¿Dejaste la app abierta en otro navegador, PC o celular? Esto cierra la sesión ahí de forma remota. Tus datos NO se borran — solo se cierra el acceso en esos otros lugares. Esta pantalla sigue funcionando normalmente.</div>
+      `}
     </div>
 
     <div class="card" style="border-color:#86efac">
@@ -3151,7 +3210,7 @@ function renderSemanaView(dates, datesWE){
         <button onclick="changeWeek(-1)">← Anterior</button>
         <span style="font-size:14px">${wl}</span>
         <button onclick="changeWeek(1)">Siguiente →</button>
-        <button onclick="clearWeekData()" title="Eliminar todas las reservas de esta semana" style="font-size:11px;padding:5px 10px;background:var(--red-lt);color:var(--red-tx);border-color:#fca5a5;border:1px solid #fca5a5;border-radius:var(--rs);cursor:pointer">🗑️ Limpiar semana</button>
+        <button onclick="clearWeekData()" title="Eliminar todas las reservas de esta semana (Básica y Media)" style="font-size:11px;padding:5px 10px;background:var(--red-lt);color:var(--red-tx);border-color:#fca5a5;border:1px solid #fca5a5;border-radius:var(--rs);cursor:pointer">🗑️ Limpiar semana (todo)</button>
       </div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px">
         <div style="background:#eff6ff;border-radius:8px;padding:10px;text-align:center"><div style="font-size:22px;font-weight:800;color:#1a56db">${total}</div><div style="font-size:11px;color:#3b82f6">Total</div></div>
