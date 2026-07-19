@@ -189,7 +189,7 @@ if (fbAuth) {
 [data-theme="dark"] .slot.is-past { background: #141e2b; border-color: #1e2a3a; }
 [data-theme="dark"] .btn-ghost { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.12); color: #a0aec0; }
 [data-theme="dark"] .btn-ghost:hover { background: rgba(255,255,255,.1); }
-[data-theme="dark"] .nota-card2 { border-color: rgba(255,255,255,.1) !important; }
+/* nota-card2: colores por tema ahora definidos vía [data-color] más abajo */
 [data-theme="dark"] .nota-title-inp2 { color: #e2e8f0 !important; }
 [data-theme="dark"] .nota-body2 { color: #a0aec0 !important; }
 [data-theme="dark"] .nota2-meta, [data-theme="dark"] .nota2-words { color: rgba(255,255,255,.3) !important; }
@@ -236,16 +236,35 @@ button, input, select, textarea { transition-duration: 0.1s; }
 }
 .theme-toggle:hover { background: rgba(255,255,255,.26); }
 
-/* Copy button for notes */
+/* Copy button for notes — chip visible y notorio, en claro y oscuro */
 .nota-copy-btn {
-  background: none; border: none; cursor: pointer;
-  color: rgba(0,0,0,.3); font-size: 13px; padding: 2px 5px;
-  border-radius: 5px; transition: all .15s; line-height: 1;
+  background: rgba(26,86,219,.10);
+  border: 1.5px solid rgba(26,86,219,.28);
+  cursor: pointer;
+  color: #1a56db;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 7px;
+  transition: all .15s;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
 }
-.nota-copy-btn:hover { background: rgba(0,0,0,.08); color: rgba(0,0,0,.65); }
-.nota-copy-btn.copied { color: #059669 !important; }
-[data-theme="dark"] .nota-copy-btn { color: rgba(255,255,255,.25); }
-[data-theme="dark"] .nota-copy-btn:hover { background: rgba(255,255,255,.08); color: rgba(255,255,255,.7); }
+.nota-copy-btn:hover { background: rgba(26,86,219,.2); border-color: rgba(26,86,219,.5); color: #1240a8; }
+.nota-copy-btn.copied { color: #059669 !important; background: rgba(5,150,105,.15) !important; border-color: rgba(5,150,105,.45) !important; }
+[data-theme="dark"] .nota-copy-btn { background: rgba(79,142,247,.16); border-color: rgba(79,142,247,.4); color: #93c5fd; }
+[data-theme="dark"] .nota-copy-btn:hover { background: rgba(79,142,247,.28); border-color: rgba(79,142,247,.65); color: #dbeafe; }
+[data-theme="dark"] .nota-copy-btn.copied { color: #6ee7b7 !important; background: rgba(52,211,153,.18) !important; border-color: rgba(52,211,153,.5) !important; }
+.nota-dup-btn {
+  background: rgba(0,0,0,.05); border: 1px solid rgba(0,0,0,.12); cursor: pointer;
+  color: rgba(0,0,0,.5); font-size: 13px; padding: 4px 6px; border-radius: 6px;
+  transition: all .15s; line-height: 1;
+}
+.nota-dup-btn:hover { background: rgba(0,0,0,.1); color: rgba(0,0,0,.75); }
+[data-theme="dark"] .nota-dup-btn { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.15); color: rgba(255,255,255,.4); }
+[data-theme="dark"] .nota-dup-btn:hover { background: rgba(255,255,255,.12); color: rgba(255,255,255,.75); }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 body{font-family:'DM Sans',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:15px;}
 button,input,select{font-family:inherit;}
@@ -354,6 +373,7 @@ button,input,select{font-family:inherit;}
 .span-badge{font-size:9px;font-weight:700;background:rgba(0,0,0,.08);color:inherit;border-radius:4px;padding:1px 5px;margin-bottom:3px;align-self:flex-start;}
 .slot.can-click{cursor:pointer;}
 .slot.can-click:hover{border-color:#93c5fd;background:#f0f7ff;}
+.slot.drag-over{border-color:#059669 !important;background:#d1fae5 !important;box-shadow:inset 0 0 0 2px #059669;}
 .slot.sb{background:var(--blue-lt);border-color:#93c5fd;}
 .slot.sm{background:var(--green-lt);border-color:#6ee7b7;}
 .slot.is-past{opacity:.4;background:#ebebeb;border-color:#d8d8d8;}
@@ -435,7 +455,21 @@ button,input,select{font-family:inherit;}
 .tab.an{background:#fef9c3;border-color:#fde047;color:#854d0e;}
 .tab.aot{background:#fdf4ff;border-color:#d8b4fe;color:#6b21a8;}
 .notas-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-bottom:10px;}
-.nota-card2{border:1.5px solid #fde047;border-radius:var(--r);padding:0;overflow:hidden;transition:box-shadow .15s,transform .1s;display:flex;flex-direction:column;}
+.nota-card2{border:1.5px solid #e5e7eb;border-radius:var(--r);padding:0;overflow:hidden;transition:box-shadow .15s,transform .1s,background-color .2s,border-color .2s;display:flex;flex-direction:column;}
+/* Colores de nota — versión clara (por defecto) */
+.nota-card2[data-color="yellow"]{background:#fefce8;border-color:#fde047;}
+.nota-card2[data-color="green"]{background:#f0fdf4;border-color:#86efac;}
+.nota-card2[data-color="blue"]{background:#eff6ff;border-color:#93c5fd;}
+.nota-card2[data-color="violet"]{background:#fdf4ff;border-color:#d8b4fe;}
+.nota-card2[data-color="orange"]{background:#fff7ed;border-color:#fdba74;}
+.nota-card2[data-color="red"]{background:#fef2f2;border-color:#fca5a5;}
+/* Colores de nota — versión oscura (mismo tono, ajustado para contraste con texto claro) */
+[data-theme="dark"] .nota-card2[data-color="yellow"]{background:#3a3110;border-color:#a16207;}
+[data-theme="dark"] .nota-card2[data-color="green"]{background:#0f2e20;border-color:#15803d;}
+[data-theme="dark"] .nota-card2[data-color="blue"]{background:#101f38;border-color:#1d4ed8;}
+[data-theme="dark"] .nota-card2[data-color="violet"]{background:#2a1240;border-color:#7e22ce;}
+[data-theme="dark"] .nota-card2[data-color="orange"]{background:#3a1f0a;border-color:#c2410c;}
+[data-theme="dark"] .nota-card2[data-color="red"]{background:#3a1212;border-color:#b91c1c;}
 .nota-card2:focus-within{box-shadow:0 4px 16px rgba(0,0,0,.12);transform:translateY(-1px);}
 .nota2-toolbar{display:flex;align-items:center;gap:6px;padding:7px 10px 5px;border-bottom:1px solid rgba(0,0,0,.06);}
 .nota2-pin{background:none;border:none;cursor:pointer;font-size:14px;padding:2px 3px;opacity:.35;transition:opacity .15s,transform .1s;}
@@ -453,6 +487,31 @@ button,input,select{font-family:inherit;}
 .nota2-footer{display:flex;align-items:center;justify-content:space-between;padding:5px 12px 7px;border-top:1px solid rgba(0,0,0,.06);}
 .nota2-meta{font-size:10px;color:rgba(0,0,0,.35);}
 .nota2-words{font-size:10px;color:rgba(0,0,0,.3);}
+.nota-drag-handle{cursor:grab;font-size:15px;color:rgba(0,0,0,.3);padding:2px 3px;line-height:1;user-select:none;}
+.nota-drag-handle:hover{color:rgba(0,0,0,.6);}
+.nota-drag-handle:active{cursor:grabbing;}
+.nota-card2.nota-drag-over{outline:2px dashed #059669;outline-offset:-2px;}
+.nota-checklist{padding:2px 12px 6px;}
+.nota-check-item{display:flex;align-items:center;gap:7px;padding:3px 0;font-size:12.5px;}
+.nota-check-wrap{display:inline-flex;cursor:pointer;position:relative;}
+.nota-check-input{position:absolute;opacity:0;width:16px;height:16px;cursor:pointer;margin:0;}
+.nota-check-box{width:15px;height:15px;border:1.5px solid rgba(0,0,0,.3);border-radius:4px;display:inline-block;flex-shrink:0;background:rgba(255,255,255,.5);transition:all .15s;}
+.nota-check-input:checked+.nota-check-box{background:#059669;border-color:#059669;}
+.nota-check-input:checked+.nota-check-box::after{content:'✓';display:block;color:#fff;font-size:11px;line-height:14px;text-align:center;font-weight:700;}
+.nota-check-text{flex:1;color:var(--tx2);word-break:break-word;}
+.nota-check-item.done .nota-check-text{text-decoration:line-through;opacity:.5;}
+.nota-check-del{background:none;border:none;cursor:pointer;color:rgba(0,0,0,.25);font-size:11px;padding:2px 3px;opacity:0;transition:opacity .15s;flex-shrink:0;}
+.nota-check-item:hover .nota-check-del{opacity:1;}
+.nota-check-del:hover{color:var(--red);}
+.nota-check-add{display:flex;align-items:center;gap:7px;padding:4px 0;}
+.nota-check-add input{flex:1;border:none;background:transparent;font-size:12.5px;padding:3px 0;outline:none;color:var(--tx2);font-family:inherit;}
+.nota-check-add input::placeholder{color:rgba(0,0,0,.3);}
+[data-theme="dark"] .nota-drag-handle{color:rgba(255,255,255,.3);}
+[data-theme="dark"] .nota-drag-handle:hover{color:rgba(255,255,255,.7);}
+[data-theme="dark"] .nota-check-box{border-color:rgba(255,255,255,.35);background:rgba(0,0,0,.2);}
+[data-theme="dark"] .nota-check-text{color:#a0aec0;}
+[data-theme="dark"] .nota-check-add input{color:#a0aec0;}
+[data-theme="dark"] .nota-check-add input::placeholder{color:rgba(255,255,255,.25);}
 /* ─── OT ─── */
 .ot-item{background:#fff;border:1.5px solid var(--gray-bd);border-radius:var(--rs);padding:12px 12px 12px 10px;margin-bottom:8px;display:flex;align-items:flex-start;gap:10px;transition:opacity .2s;}
 .ot-item.ot-done{opacity:.55;background:#f9fafb;}
@@ -1222,6 +1281,93 @@ function showToast(msg,dur=2500){
 }
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
+// Formatea una fecha "YYYY-MM-DD" como "lunes 17 de agosto"
+function formatDsLong(ds){
+  try{
+    const [y,m,d]=ds.split('-').map(Number);
+    const dt=new Date(y,m-1,d);
+    const s=dt.toLocaleDateString('es-CL',{weekday:'long',day:'numeric',month:'long'});
+    return s.charAt(0).toUpperCase()+s.slice(1);
+  }catch(e){ return ds; }
+}
+
+// ── Cartel de conflictos en pantalla ──
+// Se usa, por ejemplo, cuando al repetir una reserva varias semanas, alguna
+// semana ya tenía una clase agendada en ese bloque.
+function showConflictBanner(title, items){
+  const existing=document.getElementById('conflictBannerFixed');
+  if(existing) existing.remove();
+  if(!items || !items.length) return;
+  const banner=document.createElement('div');
+  banner.id='conflictBannerFixed';
+  banner.style.cssText=`
+    position:fixed;top:16px;left:50%;transform:translateX(-50%);
+    background:#fef3c7;border:1.5px solid #fcd34d;color:#92400e;
+    border-radius:12px;padding:14px 16px;max-width:min(92vw,440px);
+    box-shadow:0 10px 32px rgba(0,0,0,.2);z-index:3000;font-size:13px;
+    font-family:'DM Sans',system-ui,sans-serif;
+  `;
+  banner.innerHTML=`
+    <div style="display:flex;align-items:flex-start;gap:10px">
+      <div style="font-size:20px;line-height:1">⚠️</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700;margin-bottom:6px">${esc(title)}</div>
+        <div style="line-height:1.7;max-height:180px;overflow-y:auto">${items.map(t=>`• ${esc(t)}`).join('<br>')}</div>
+      </div>
+      <button onclick="document.getElementById('conflictBannerFixed')?.remove()" style="background:none;border:none;font-size:16px;cursor:pointer;color:#92400e;line-height:1;padding:0 2px">✕</button>
+    </div>`;
+  document.body.appendChild(banner);
+  setTimeout(()=>{ document.getElementById('conflictBannerFixed')?.remove(); }, 14000);
+}
+
+// ── Arrastrar y soltar reservas (mover a otro día/hora) ──
+window._dragBookingKey=null;
+window._dragBookingLevel=null;
+function handleDragStart(e, key, level){
+  window._dragBookingKey=key;
+  window._dragBookingLevel=level;
+  try{ e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain', key); }catch(err){}
+}
+function handleDragEnd(e){
+  document.querySelectorAll('.slot.drag-over').forEach(el=>el.classList.remove('drag-over'));
+}
+function handleDragOver(e){
+  e.preventDefault();
+  try{ e.dataTransfer.dropEffect='move'; }catch(err){}
+  e.currentTarget.classList.add('drag-over');
+}
+function handleDragLeave(e){
+  e.currentTarget.classList.remove('drag-over');
+}
+function handleDrop(e, ds, bi, level){
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  const oldKey=window._dragBookingKey;
+  const oldLevel=window._dragBookingLevel;
+  window._dragBookingKey=null; window._dragBookingLevel=null;
+  if(!oldKey || !data.bookings[oldKey]) return;
+  if(oldLevel!==level){ showToast('⚠️ Solo puedes mover una reserva dentro del mismo nivel (Básica o Media)'); return; }
+  const prefix=level==='basica'?'b':'m';
+  const newKey=slotKey(ds,prefix,bi);
+  if(newKey===oldKey) return;
+  if(data.bookings[newKey]){ showToast('⚠️ Ese bloque ya está ocupado'); return; }
+  const blk=getBlocks(level)[bi];
+  if(!blk || blk.isBreak){ showToast('⚠️ No puedes soltar una reserva en un recreo'); return; }
+
+  const bkData={...data.bookings[oldKey]};
+  bkData.ds=ds; bkData.bi=bi; bkData.prefix=prefix; bkData.startTime=blk.start; bkData.endTime=blk.end;
+  data.bookings[newKey]=bkData;
+  if(data.tickets[oldKey]!==undefined) data.tickets[newKey]=data.tickets[oldKey];
+
+  markDeleted('bookings', oldKey); markDeleted('tickets', oldKey);
+  delete data.bookings[oldKey]; delete data.tickets[oldKey];
+  Object.keys(data.notified).forEach(nk=>{ if(nk.startsWith(oldKey)) delete data.notified[nk]; });
+
+  saveData(); renderMain();
+  showToast(`↔️ Reserva movida a ${formatDsLong(ds)} — ${blk.label} (${toAmPm(blk.start)})`, 3500);
+  syncToGAS();
+}
+
 function getUserInitials(){
   if(window._guestMode) return '?';
   const u=window._currentUser; if(!u) return '?';
@@ -1425,10 +1571,9 @@ function renderMain(){
       <div class="tab ${ui.level==='media'?'am':''}"  onclick="setLevel('media')">📗 Media</div>
       <div class="tab ${ui.level==='todos'?'at':''}"  onclick="setLevel('todos')">📋 Semana</div>
       <div class="tab ${ui.level==='notas'?'an':''}"  onclick="setLevel('notas')">📝 Notas</div>
-      <div class="tab ${ui.level==='ot'?'aot':''}"    onclick="setLevel('ot')">🔧 OT</div>
     </div>
 
-    ${ui.level==='notas'?`<div id="notasView"></div>`:ui.level==='todos'?`<div id="semanaView"></div>`:ui.level==='ot'?`<div id="otView"></div>`:`
+    ${ui.level==='notas'?`<div id="notasView"></div>`:ui.level==='todos'?`<div id="semanaView"></div>`:`
 
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
       <div style="flex:1;height:2px;background:linear-gradient(90deg,var(--blue),transparent)"></div>
@@ -1465,7 +1610,6 @@ function renderMain(){
 
   if(ui.level==='notas'){ renderNotas(); }
   else if(ui.level==='todos'){ renderSemanaView(dates,datesWE); }
-  else if(ui.level==='ot'){ renderOT(); }
   else {
     renderGrid(dates);
     renderToday(dates);
@@ -1586,7 +1730,20 @@ function renderGrid(dates){
         inner=`<div class="slot-plus">+</div>`;
       }
       const oc=(!past&&!bk)?`onclick="openBook('${ds}',${bi},'${dispLv}')"`:(bk?`onclick="openBook('${ds}',${bi},'${bkLv||dispLv}',true)"` :'');
-      html+=`<div class="${cls}" style="${rowSpanStyle}" ${oc}>${inner}</div>`;
+
+      // ── Arrastrar y soltar (solo en vistas de un solo nivel: Básica o Media) ──
+      const dragEnabled = ui.level==='basica' || ui.level==='media';
+      let dragAttrs='';
+      let extraStyle='';
+      if(dragEnabled){
+        if(bk && sp===1){
+          dragAttrs += ` draggable="true" ondragstart="handleDragStart(event,'${bkKey}','${bkLv}')" ondragend="handleDragEnd(event)"`;
+          extraStyle = ';cursor:grab';
+        } else if(!bk && !past){
+          dragAttrs += ` ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event,'${ds}',${bi},'${dispLv}')"`;
+        }
+      }
+      html+=`<div class="${cls}" style="${rowSpanStyle}${extraStyle}" ${oc}${dragAttrs}>${inner}</div>`;
     });
   });
 
@@ -1853,7 +2010,7 @@ function saveBook(){
       }
     }
 
-    let repeatCount=0, repeatSkipped=0;
+    let repeatCount=0, repeatSkipped=0, repeatSkippedDates=[];
     if(!editMode){
       const repeatChecked = document.getElementById('bRepeat')?.checked;
       const weeksTotal = parseInt(document.getElementById('bRepeatWeeks')?.value) || 1;
@@ -1870,7 +2027,7 @@ function saveBook(){
           const newKey = weSlotKey(newDs, newLevel, bi);
           // Cada semana se guarda de forma independiente; eliminar una
           // reserva puntual nunca afecta a las demás semanas de la serie.
-          if(data.bookings[newKey]){ repeatSkipped++; continue; }
+          if(data.bookings[newKey]){ repeatSkipped++; repeatSkippedDates.push(formatDsLong(newDs)); continue; }
           data.bookings[newKey]={course,level:newLevel,teacher:document.getElementById('bTeacher').value.trim(),ds:newDs,bi,prefix:newLevel==='basica'?'wb':'wm',startTime:bl.start,endTime:bl.end,isWE:true,_id:generateBookingId(),_seriesId:seriesId};
           repeatCount++;
           if(!oneHourOnlyWE){
@@ -1894,10 +2051,12 @@ function saveBook(){
       else if(!oneHourOnlyWE && secondBlockFailReasonWE) msgWE += ` — solo 1 hora (${secondBlockFailReasonWE})`;
       if(repeatCount>0){
         msgWE += ` + ${repeatCount} semana${repeatCount!==1?'s':''} más`;
-        if(repeatSkipped>0) msgWE += ` (${repeatSkipped} ya ocupada${repeatSkipped!==1?'s':''}, se saltó)`;
       }
     }
     showToast(msgWE, 4500);
+    if(repeatSkippedDates.length){
+      showConflictBanner(`"${course}" ya tenía una reserva en este bloque estos días — no se sobrescribió:`, repeatSkippedDates);
+    }
     syncToGAS();
     setTimeout(checkPendingNotifs, 500);
     return;
@@ -2992,15 +3151,73 @@ function renderSemanaView(dates, datesWE){
 }
 
 // ══════════════════════════════════════════
-// NOTAS (MEJORADO)
+// NOTAS (INTERACTIVAS: checklist + reordenar arrastrando + duplicar)
 // ══════════════════════════════════════════
 let _notesSaveTimer=null;
 const NOTA_COLORS=['#fefce8','#f0fdf4','#eff6ff','#fdf4ff','#fff7ed','#fef2f2'];
 const NOTA_COLOR_NAMES=['Amarillo','Verde','Azul','Violeta','Naranja','Rojo'];
+window._dragNoteId=null;
+
+// Migración silenciosa: asegura que todas las notas tengan un campo 'order'
+// numérico (necesario para poder reordenarlas arrastrando).
+function ensureNotesOrder(){
+  const entries=Object.entries(data.notes||{});
+  const missing=entries.some(([,n])=> n.order===undefined || n.order===null);
+  if(!missing) return;
+  const sorted=entries.sort((a,b)=>(b[1].updatedAt||0)-(a[1].updatedAt||0));
+  sorted.forEach(([id],idx)=>{ data.notes[id].order=idx; });
+  saveData();
+}
+
+const NOTA_COLOR_KEY={'#fefce8':'yellow','#f0fdf4':'green','#eff6ff':'blue','#fdf4ff':'violet','#fff7ed':'orange','#fef2f2':'red'};
+
+function renderNotaCard(nid, nota){
+  const color=nota.color||NOTA_COLORS[0];
+  const colorKey=NOTA_COLOR_KEY[color]||'yellow';
+  const wordsCount=(nota.body||'').trim().split(/\s+/).filter(Boolean).length;
+  const ts=nota.updatedAt?new Date(nota.updatedAt).toLocaleString('es-CL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'Nueva';
+  const checklist=nota.checklist||[];
+  const doneCount=checklist.filter(i=>i.done).length;
+  return `<div class="nota-card2" id="nota_${nid}" data-color="${colorKey}"
+      ondragover="handleNoteDragOver(event,'${nid}')" ondragleave="handleNoteDragLeave(event)" ondrop="handleNoteDrop(event,'${nid}')">
+    <div class="nota2-toolbar">
+      <span class="nota-drag-handle" draggable="true" ondragstart="handleNoteDragStart(event,'${nid}')" title="Arrastrar para reordenar">⠿</span>
+      <button class="nota2-pin ${nota.pinned?'on':''}" onclick="toggleNotaPin('${nid}')" title="${nota.pinned?'Desfijar':'Fijar'}">📌</button>
+      <div class="nota2-colors">
+        ${NOTA_COLORS.map((c,ci)=>`<button class="nota2-color-dot ${nota.color===c||(!nota.color&&ci===0)?'sel':''}" style="background:${c};border-color:${ci===0?'#fde047':ci===1?'#86efac':ci===2?'#93c5fd':ci===3?'#d8b4fe':ci===4?'#fdba74':'#fca5a5'}" onclick="setNotaColor('${nid}','${c}')" title="${NOTA_COLOR_NAMES[ci]}"></button>`).join('')}
+      </div>
+      <button class="nota-dup-btn" onclick="duplicateNota('${nid}')" title="Duplicar nota">⧉</button>
+      <button class="nota-copy-btn" onclick="copyNota('${nid}')" title="Copiar nota">⎘ Copiar</button>
+      <button class="nota-del" onclick="deleteNota('${nid}')" title="Eliminar">🗑️</button>
+    </div>
+    <input class="nota-title-inp2" placeholder="Título..." value="${esc(nota.title||'')}" oninput="scheduleNotaSave('${nid}','title',this.value)" style="background:transparent"/>
+    <textarea class="nota-body2" placeholder="Escribe tu nota aquí..." oninput="scheduleNotaSave('${nid}','body',this.value)" style="background:transparent;min-height:80px">${esc(nota.body||'')}</textarea>
+    <div class="nota-checklist">
+      ${checklist.map(item=>`
+        <div class="nota-check-item ${item.done?'done':''}" data-item-id="${item.id}">
+          <label class="nota-check-wrap">
+            <input type="checkbox" class="nota-check-input" ${item.done?'checked':''} onchange="toggleChecklistItem('${nid}','${item.id}',this.checked)"/>
+            <span class="nota-check-box"></span>
+          </label>
+          <span class="nota-check-text">${esc(item.text)}</span>
+          <button class="nota-check-del" onclick="deleteChecklistItem('${nid}','${item.id}')" title="Quitar tarea">✕</button>
+        </div>`).join('')}
+      <div class="nota-check-add">
+        <span style="opacity:.5">☐</span>
+        <input type="text" placeholder="+ Agregar tarea…" onkeydown="if(event.key==='Enter'){addChecklistItem('${nid}', this.value); this.value=''; event.preventDefault();}"/>
+      </div>
+    </div>
+    <div class="nota2-footer">
+      <span class="nota2-meta">${ts}${checklist.length?` · ${doneCount}/${checklist.length} tareas`:''}</span>
+      <span class="nota2-words">${wordsCount} palabra${wordsCount!==1?'s':''}</span>
+    </div>
+  </div>`;
+}
 
 function renderNotas(){
   const s=document.getElementById('notasView'); if(!s) return;
-  const notesList=Object.entries(data.notes||{}).sort((a,b)=>b[1].updatedAt-a[1].updatedAt);
+  ensureNotesOrder();
+  const notesList=Object.entries(data.notes||{}).sort((a,b)=>(a[1].order??0)-(b[1].order??0));
   const pinned  = notesList.filter(([,n])=>n.pinned);
   const unpinned= notesList.filter(([,n])=>!n.pinned);
   const total=notesList.length;
@@ -3009,27 +3226,7 @@ function renderNotas(){
   const renderGroup=(list,label)=> list.length===0?'':`
     <div style="font-size:11px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.06em;margin:10px 0 6px;padding:0 2px">${label}</div>
     <div class="notas-grid">
-      ${list.map(([nid,nota])=>{
-        const color=nota.color||NOTA_COLORS[0];
-        const wordsCount=(nota.body||'').trim().split(/\s+/).filter(Boolean).length;
-        const ts=nota.updatedAt?new Date(nota.updatedAt).toLocaleString('es-CL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'Nueva';
-        return `<div class="nota-card2" id="nota_${nid}" style="background:${color};border-color:${color==='#fefce8'?'#fde047':color==='#f0fdf4'?'#86efac':color==='#eff6ff'?'#93c5fd':color==='#fdf4ff'?'#d8b4fe':color==='#fff7ed'?'#fdba74':'#fca5a5'}">
-          <div class="nota2-toolbar">
-            <button class="nota2-pin ${nota.pinned?'on':''}" onclick="toggleNotaPin('${nid}')" title="${nota.pinned?'Desfijar':'Fijar'}">📌</button>
-            <div class="nota2-colors">
-              ${NOTA_COLORS.map((c,ci)=>`<button class="nota2-color-dot ${nota.color===c||(!nota.color&&ci===0)?'sel':''}" style="background:${c};border-color:${ci===0?'#fde047':ci===1?'#86efac':ci===2?'#93c5fd':ci===3?'#d8b4fe':ci===4?'#fdba74':'#fca5a5'}" onclick="setNotaColor('${nid}','${c}')" title="${NOTA_COLOR_NAMES[ci]}"></button>`).join('')}
-            </div>
-            <button class="nota-copy-btn" onclick="copyNota('${nid}')" title="Copiar nota">⎘</button>
-            <button class="nota-del" onclick="deleteNota('${nid}')" title="Eliminar">🗑️</button>
-          </div>
-          <input class="nota-title-inp2" placeholder="Título..." value="${esc(nota.title||'')}" oninput="scheduleNotaSave('${nid}','title',this.value)" style="background:transparent"/>
-          <textarea class="nota-body2" placeholder="Escribe tu nota aquí..." oninput="scheduleNotaSave('${nid}','body',this.value)" style="background:transparent">${esc(nota.body||'')}</textarea>
-          <div class="nota2-footer">
-            <span class="nota2-meta">${ts}</span>
-            <span class="nota2-words">${wordsCount} palabra${wordsCount!==1?'s':''}</span>
-          </div>
-        </div>`;
-      }).join('')}
+      ${list.map(([nid,nota])=>renderNotaCard(nid,nota)).join('')}
     </div>`;
 
   s.innerHTML=`
@@ -3037,7 +3234,7 @@ function renderNotas(){
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
         <div>
           <div style="font-size:14px;font-weight:700;color:var(--tx2)">📝 Notas</div>
-          <div style="font-size:11px;color:var(--tx3);margin-top:2px">${total} nota${total!==1?'s':''} · ${withBody} con contenido</div>
+          <div style="font-size:11px;color:var(--tx3);margin-top:2px">${total} nota${total!==1?'s':''} · ${withBody} con contenido · arrastra ⠿ para reordenar</div>
         </div>
         <div style="display:flex;gap:8px">
           <input id="notaSearch" placeholder="🔍 Buscar..." style="padding:7px 11px;font-size:13px;border:1.5px solid var(--gray-bd);border-radius:var(--rs);background:#fff;color:var(--text);font-family:inherit;width:160px" oninput="filterNotas(this.value)"/>
@@ -3063,25 +3260,39 @@ function filterNotas(q){
   if(!q.trim()){ renderNotas(); return; }
   const low=q.toLowerCase();
   const filtered=Object.entries(data.notes||{}).filter(([,n])=>
-    (n.title||'').toLowerCase().includes(low)||(n.body||'').toLowerCase().includes(low)
-  ).sort((a,b)=>b[1].updatedAt-a[1].updatedAt);
+    (n.title||'').toLowerCase().includes(low)||(n.body||'').toLowerCase().includes(low)||
+    (n.checklist||[]).some(i=>(i.text||'').toLowerCase().includes(low))
+  ).sort((a,b)=>(a[1].order??0)-(b[1].order??0));
   const cont=document.getElementById('notasListContainer'); if(!cont) return;
   if(!filtered.length){ cont.innerHTML=`<div class="card" style="text-align:center;padding:24px;color:var(--tx3);font-size:13px">Sin resultados para "${esc(q)}"</div>`; return; }
-  cont.innerHTML=`<div class="notas-grid">${filtered.map(([nid,nota])=>{
-    const color=nota.color||NOTA_COLORS[0];
-    return `<div class="nota-card2" style="background:${color}">
-      <input class="nota-title-inp2" style="background:transparent" value="${esc(nota.title||'')}" oninput="scheduleNotaSave('${nid}','title',this.value)" placeholder="Título..."/>
-      <textarea class="nota-body2" style="background:transparent" oninput="scheduleNotaSave('${nid}','body',this.value)">${esc(nota.body||'')}</textarea>
-    </div>`;
-  }).join('')}</div>`;
+  cont.innerHTML=`<div class="notas-grid">${filtered.map(([nid,nota])=>renderNotaCard(nid,nota)).join('')}</div>`;
 }
 
 function createNota(){
   const nid='n_'+Date.now();
   if(!data.notes) data.notes={};
-  data.notes[nid]={title:'',body:'',color:NOTA_COLORS[0],pinned:false,createdAt:Date.now(),updatedAt:Date.now()};
+  ensureNotesOrder();
+  const maxOrder=Math.max(-1, ...Object.values(data.notes).map(n=>n.order??-1));
+  data.notes[nid]={title:'',body:'',color:NOTA_COLORS[0],pinned:false,checklist:[],order:maxOrder+1,createdAt:Date.now(),updatedAt:Date.now()};
   saveData(); renderNotas();
   setTimeout(()=>{ const ta=document.querySelector(`#nota_${nid} .nota-body2`); if(ta) ta.focus(); },100);
+}
+function duplicateNota(nid){
+  const nota=data.notes[nid]; if(!nota) return;
+  const newId='n_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+  ensureNotesOrder();
+  const maxOrder=Math.max(-1, ...Object.values(data.notes).map(n=>n.order??-1));
+  data.notes[newId]={
+    title: nota.title ? nota.title+' (copia)' : '',
+    body: nota.body||'',
+    color: nota.color||NOTA_COLORS[0],
+    pinned:false,
+    checklist:(nota.checklist||[]).map(i=>({id:'t_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),text:i.text,done:false})),
+    order:maxOrder+1,
+    createdAt:Date.now(), updatedAt:Date.now()
+  };
+  saveData(); renderNotas();
+  showToast('⧉ Nota duplicada');
 }
 function toggleNotaPin(nid){
   if(!data.notes[nid]) return;
@@ -3108,175 +3319,68 @@ function deleteNota(nid){
   saveData(); renderNotas(); showToast('Nota eliminada');
 }
 
-// ══════════════════════════════════════════
-// OT — ÓRDENES DE TRABAJO (Gmail)
-// ══════════════════════════════════════════
-function renderOT(){
-  const s=document.getElementById('otView'); if(!s) return;
-  if(!data.ots) data.ots={};
-  const otList=Object.entries(data.ots).sort((a,b)=>b[1].createdAt-a[1].createdAt);
-  const pending=otList.filter(([,o])=>!o.done).length;
-  const done=otList.filter(([,o])=>o.done).length;
-
-  s.innerHTML=`
-    <div class="card" style="padding:12px 14px;margin-bottom:10px">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px">
-        <div>
-          <div style="font-size:14px;font-weight:700;color:#6b21a8">🔧 Órdenes de Trabajo</div>
-          <div style="font-size:11px;color:var(--tx3);margin-top:2px">${pending} pendiente${pending!==1?'s':''} · ${done} realizada${done!==1?'s':''}</div>
-        </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn" style="background:#f3e8ff;color:#6b21a8;border:none;padding:7px 12px;font-size:12px;font-weight:700" onclick="fetchGmailOTs()">
-            📧 Sincronizar Gmail
-          </button>
-          <button class="btn" style="background:#6b21a8;color:#fff;border:none;padding:7px 14px;font-size:13px;font-weight:700" onclick="openNewOT()">
-            + Nueva OT
-          </button>
-        </div>
-      </div>
-      <div id="gmailSyncStatus" style="display:none"></div>
-    </div>
-
-    ${otList.length===0
-      ? `<div class="card" style="text-align:center;padding:40px 20px">
-          <div style="font-size:40px;margin-bottom:10px">🔧</div>
-          <div style="font-size:15px;font-weight:600;color:var(--tx2);margin-bottom:6px">Sin órdenes de trabajo</div>
-          <div style="font-size:13px;color:var(--tx3);margin-bottom:16px">Sincroniza tu Gmail para importar emails con código OS+número, o crea una manualmente</div>
-          <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
-            <button class="btn" style="background:#f3e8ff;color:#6b21a8;border:none;padding:9px 18px;font-size:13px;font-weight:700" onclick="fetchGmailOTs()">📧 Sincronizar Gmail</button>
-            <button class="btn" style="background:#6b21a8;color:#fff;border:none;padding:9px 18px;font-size:13px;font-weight:700" onclick="openNewOT()">+ Nueva OT manual</button>
-          </div>
-        </div>`
-      : `<div id="otListContainer">
-          ${renderOTList(otList)}
-        </div>`
-    }
-
-    <!-- Modal Nueva OT -->
-    <div id="otModal" class="modal-bg" style="display:none" onclick="if(event.target===this)closeOTModal()">
-      <div class="modal" style="max-width:420px">
-        <h3>🔧 Nueva Orden de Trabajo</h3>
-        <div class="fr"><label>Código OS</label>
-          <input class="inp" id="ot_codigo" placeholder="Ej: OS-1234" style="font-family:'DM Mono',monospace;font-weight:700"/>
-        </div>
-        <div class="fr"><label>Descripción</label>
-          <textarea class="inp" id="ot_desc" placeholder="Descripción del trabajo..." style="min-height:80px;resize:vertical"></textarea>
-        </div>
-        <div class="fr"><label>Prioridad</label>
-          <select class="inp" id="ot_prio">
-            <option value="normal">Normal</option>
-            <option value="alta">Alta</option>
-            <option value="urgente">Urgente</option>
-          </select>
-        </div>
-        <div class="fr"><label>Origen</label>
-          <input class="inp" id="ot_origen" placeholder="Ej: Email, Verbal, Sistema..." value="Manual"/>
-        </div>
-        <div class="btn-row">
-          <button class="btn-ghost" style="flex:1" onclick="closeOTModal()">Cancelar</button>
-          <button class="btn btn-blue" style="flex:1" onclick="saveNewOT()">Crear OT ✓</button>
-        </div>
-      </div>
-    </div>`;
+// ── Checklist dentro de cada nota ──
+function addChecklistItem(nid, text){
+  text=(text||'').trim();
+  if(!text || !data.notes[nid]) return;
+  if(!data.notes[nid].checklist) data.notes[nid].checklist=[];
+  data.notes[nid].checklist.push({id:'t_'+Date.now()+'_'+Math.random().toString(36).slice(2,6), text, done:false});
+  data.notes[nid].updatedAt=Date.now();
+  saveData(); renderNotas();
 }
-
-function renderOTList(otList){
-  const pending=otList.filter(([,o])=>!o.done);
-  const done   =otList.filter(([,o])=>o.done);
-  const renderItem=([oid,ot])=>{
-    const prioColor=ot.priority==='urgente'?'#dc2626':ot.priority==='alta'?'#d97706':'#6b7280';
-    const prioBg=ot.priority==='urgente'?'#fee2e2':ot.priority==='alta'?'#fef3c7':'#f3f4f6';
-    const ts=ot.createdAt?new Date(ot.createdAt).toLocaleDateString('es-CL',{day:'numeric',month:'short',year:'numeric'}):'—';
-    const gmailBadge=ot.fromGmail?`<span style="background:#e8f0fe;color:#1a56db;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700">📧 Gmail</span>`:'';
-    return `<div class="ot-item ${ot.done?'ot-done':''}" id="ot_${oid}">
-      <div class="ot-check-col">
-        <label class="ot-check-wrap" title="${ot.done?'Marcar pendiente':'Marcar como realizada'}">
-          <input type="checkbox" class="ot-check" ${ot.done?'checked':''} onchange="toggleOT('${oid}',this.checked)"/>
-          <span class="ot-checkmark"></span>
-        </label>
-      </div>
-      <div class="ot-body">
-        <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:3px">
-          <span class="ot-code">${esc(ot.code||'—')}</span>
-          <span style="background:${prioBg};color:${prioColor};padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700">${ot.priority||'normal'}</span>
-          ${gmailBadge}
-          ${ot.doneAt?`<span style="background:#d1fae5;color:#065f46;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700">✓ ${new Date(ot.doneAt).toLocaleDateString('es-CL',{day:'numeric',month:'short'})}</span>`:''}
-        </div>
-        <div class="ot-desc">${esc(ot.description||'Sin descripción')}</div>
-        ${ot.origen?`<div style="font-size:10px;color:var(--tx3);margin-top:2px">Origen: ${esc(ot.origen)}</div>`:''}
-        <div style="font-size:10px;color:var(--tx3);margin-top:3px">Creada: ${ts}${ot.gmailDate?` · Email: ${esc(ot.gmailDate)}`:''}${ot.gmailFrom?` · De: ${esc(ot.gmailFrom)}`:''}${ot.gmailSubject?`<br><span style="color:#6b7280">Asunto: ${esc(ot.gmailSubject)}</span>`:''}</div>
-      </div>
-      <div class="ot-actions">
-        <button class="ot-del-btn" onclick="deleteOT('${oid}')" title="Eliminar">🗑️</button>
-      </div>
-    </div>`;
-  };
-  let html='';
-  if(pending.length){
-    html+=`<div style="font-size:11px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px">⏳ Pendientes (${pending.length})</div>`;
-    html+=pending.map(renderItem).join('');
-  }
-  if(done.length){
-    html+=`<div style="font-size:11px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.06em;margin:14px 0 8px">✅ Realizadas (${done.length})</div>`;
-    html+=done.map(renderItem).join('');
-  }
-  return html;
-}
-
-function toggleOT(oid, checked){
-  if(!data.ots[oid]) return;
-  data.ots[oid].done=checked;
-  data.ots[oid].doneAt=checked?Date.now():null;
+function toggleChecklistItem(nid, itemId, done){
+  const nota=data.notes[nid]; if(!nota || !nota.checklist) return;
+  const item=nota.checklist.find(i=>i.id===itemId); if(!item) return;
+  item.done=done;
+  nota.updatedAt=Date.now();
   saveData();
-  // Re-render solo la lista
-  const cont=document.getElementById('otListContainer');
-  if(cont){
-    const otList=Object.entries(data.ots).sort((a,b)=>b[1].createdAt-a[1].createdAt);
-    cont.innerHTML=renderOTList(otList);
-  } else { renderOT(); }
-  showToast(checked?'✅ OT marcada como realizada':'↩️ OT marcada como pendiente');
+  // Actualiza solo visualmente este ítem, sin re-renderizar toda la nota
+  // (para no perder el foco si estás escribiendo en otra parte de la nota).
+  const el=document.querySelector(`#nota_${nid} .nota-check-item[data-item-id="${itemId}"]`);
+  if(el) el.classList.toggle('done', done);
+}
+function deleteChecklistItem(nid, itemId){
+  const nota=data.notes[nid]; if(!nota || !nota.checklist) return;
+  nota.checklist=nota.checklist.filter(i=>i.id!==itemId);
+  nota.updatedAt=Date.now();
+  saveData(); renderNotas();
 }
 
-function deleteOT(oid){
-  if(!confirm('¿Eliminar esta OT?')) return;
-  markDeleted('ots', oid);
-  delete data.ots[oid];
-  saveData(); renderOT(); showToast('OT eliminada');
+// ── Arrastrar para reordenar notas ──
+function handleNoteDragStart(e, nid){
+  window._dragNoteId=nid;
+  try{ e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain', nid); }catch(err){}
+}
+function handleNoteDragOver(e, nid){
+  e.preventDefault();
+  try{ e.dataTransfer.dropEffect='move'; }catch(err){}
+  const card=document.getElementById('nota_'+nid);
+  if(card) card.classList.add('nota-drag-over');
+}
+function handleNoteDragLeave(e){
+  e.currentTarget.classList.remove('nota-drag-over');
+}
+function handleNoteDrop(e, targetNid){
+  e.preventDefault();
+  e.currentTarget.classList.remove('nota-drag-over');
+  const draggedNid=window._dragNoteId;
+  window._dragNoteId=null;
+  if(!draggedNid || draggedNid===targetNid) return;
+  if(!data.notes[draggedNid] || !data.notes[targetNid]) return;
+
+  ensureNotesOrder();
+  const allSorted=Object.entries(data.notes).sort((a,b)=>(a[1].order??0)-(b[1].order??0)).map(([id])=>id);
+  const fromIdx=allSorted.indexOf(draggedNid);
+  if(fromIdx===-1) return;
+  allSorted.splice(fromIdx,1);
+  const toIdx=allSorted.indexOf(targetNid);
+  if(toIdx===-1) return;
+  allSorted.splice(toIdx,0,draggedNid);
+  allSorted.forEach((id,idx)=>{ if(data.notes[id]) data.notes[id].order=idx; });
+  saveData(); renderNotas();
+  showToast('↕️ Nota reordenada', 1500);
 }
 
-function openNewOT(){
-  document.getElementById('otModal').style.display='flex';
-  setTimeout(()=>document.getElementById('ot_codigo').focus(),100);
-}
-function closeOTModal(){ document.getElementById('otModal').style.display='none'; }
-
-function saveNewOT(){
-  const code=document.getElementById('ot_codigo').value.trim();
-  const desc=document.getElementById('ot_desc').value.trim();
-  const prio=document.getElementById('ot_prio').value;
-  const origen=document.getElementById('ot_origen').value.trim()||'Manual';
-  if(!code){ showToast('Ingresa el código OS'); return; }
-  if(!data.ots) data.ots={};
-  const oid='ot_'+Date.now();
-  data.ots[oid]={code,description:desc,priority:prio,origen,done:false,doneAt:null,createdAt:Date.now()};
-  saveData(); closeOTModal(); renderOT();
-  showToast(`✓ OT ${code} creada`);
-}
-
-// ── SINCRONIZACIÓN CON GMAIL via MCP ──
-function fetchGmailOTs(){
-  // La sincronización automática con Gmail no está disponible en esta versión.
-  const statusEl=document.getElementById('gmailSyncStatus');
-  if(statusEl){
-    statusEl.style.display='block';
-    statusEl.innerHTML=`<div style="background:#fefce8;border:1.5px solid #fde047;border-radius:var(--rs);padding:12px 16px;font-size:13px;color:#854d0e;line-height:1.6">
-      ℹ️ <b>Sincronización con Gmail no disponible</b><br>
-      <span style="font-size:12px">Esta función requiere una integración que no está activa. Crea tus OT manualmente con el formulario de abajo.</span>
-    </div>`;
-    setTimeout(()=>{ statusEl.style.display='none'; }, 5000);
-  }
-  showToast('ℹ️ Usa el formulario para crear OT manualmente', 3500);
-}
 // ══════════════════════════════════════════
 // IMPRIMIR
 // ══════════════════════════════════════════
@@ -3476,7 +3580,7 @@ function copyNota(nid){
   if(!text){ showToast('La nota está vacía', 1500); return; }
   navigator.clipboard.writeText(text).then(()=>{
     const btn = document.querySelector(`#nota_${nid} .nota-copy-btn`);
-    if(btn){ btn.classList.add('copied'); btn.textContent='✓'; setTimeout(()=>{ btn.classList.remove('copied'); btn.textContent='⎘'; },1800); }
+    if(btn){ btn.classList.add('copied'); btn.textContent='✓ Copiado'; setTimeout(()=>{ btn.classList.remove('copied'); btn.textContent='⎘ Copiar'; },1800); }
     showToast('📋 Nota copiada', 1800);
   }).catch(()=>{
     // Fallback for non-https
