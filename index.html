@@ -1593,6 +1593,7 @@ function renderMain(){
         <span>${wl}</span>
         <button onclick="changeWeek(0)" title="Ir a semana actual" style="font-size:11px;padding:5px 10px;background:var(--blue-lt);color:var(--blue-tx);border-color:#93c5fd">Hoy</button>
         <button onclick="changeWeek(1)" title="Semana siguiente (→)">Siguiente →</button>
+        <button onclick="clearWeekData()" title="Eliminar todas las reservas de esta semana" style="font-size:11px;padding:5px 10px;background:var(--red-lt);color:var(--red-tx);border-color:#fca5a5">🗑️ Limpiar semana</button>
         <div class="zoom-controls">
           <button class="zoom-btn" data-dir="out" onclick="zoomOut()" title="Reducir">−</button>
           <span class="zoom-level">${Math.round((ZOOM_HEIGHTS[ui.calZoom-1]/62)*100)}%</span>
@@ -1934,6 +1935,43 @@ function changeWeek(d){
   if(d===0){ ui.weekOffset=0; }
   else { ui.weekOffset+=d; }
   renderMain();
+}
+// ── Limpiar solo la semana que se está viendo ──
+// Borra todas las reservas (Básica, Media y fin de semana) cuya fecha caiga
+// dentro de la semana actualmente mostrada (según ui.weekOffset). El resto
+// de las semanas del calendario no se ven afectadas.
+function clearWeekData(){
+  const dates   = getWeekDates(ui.weekOffset);     // lunes a viernes
+  const datesWE = getWeekendDates(ui.weekOffset);  // sábado y domingo
+  const allDates = [...dates, ...datesWE];
+  const dsSet = new Set(allDates.map(d=>dStr(d)));
+
+  const keysToDelete = Object.keys(data.bookings).filter(k=>{
+    const bk = data.bookings[k];
+    return bk && bk.ds && dsSet.has(bk.ds);
+  });
+
+  const f = dates[0], l = datesWE[1];
+  const wl = `${f.getDate()}/${f.getMonth()+1} al ${l.getDate()}/${l.getMonth()+1}/${l.getFullYear()}`;
+
+  if(!keysToDelete.length){
+    showToast(`No hay reservas esa semana (${wl}) para limpiar`, 3000);
+    return;
+  }
+
+  if(!confirm(`¿Eliminar TODAS las reservas de la semana del ${wl}?\n\nSe borrarán ${keysToDelete.length} reserva${keysToDelete.length!==1?'s':''} (Básica, Media y fin de semana de esa semana puntual).\n\nEsta acción no se puede deshacer. Las demás semanas del calendario NO se ven afectadas.`)) return;
+
+  keysToDelete.forEach(k=>{
+    markDeleted('bookings', k); markDeleted('tickets', k);
+    delete data.bookings[k];
+    delete data.tickets[k];
+    Object.keys(data.notified).forEach(nk=>{ if(nk.startsWith(k)) delete data.notified[nk]; });
+  });
+
+  saveData(); renderMain();
+  showToast(`🗑️ Semana del ${wl} limpiada — ${keysToDelete.length} reserva${keysToDelete.length!==1?'s':''} eliminada${keysToDelete.length!==1?'s':''}`, 4500);
+  addNotifLog(`🗑️ Semana limpiada manualmente (${wl}): ${keysToDelete.length} reserva(s) eliminada(s)`, 'warn');
+  syncToGAS();
 }
 // Keyboard nav: ← → arrows when not focused on input
 document.addEventListener('keydown',function(e){
@@ -3113,6 +3151,7 @@ function renderSemanaView(dates, datesWE){
         <button onclick="changeWeek(-1)">← Anterior</button>
         <span style="font-size:14px">${wl}</span>
         <button onclick="changeWeek(1)">Siguiente →</button>
+        <button onclick="clearWeekData()" title="Eliminar todas las reservas de esta semana" style="font-size:11px;padding:5px 10px;background:var(--red-lt);color:var(--red-tx);border-color:#fca5a5;border:1px solid #fca5a5;border-radius:var(--rs);cursor:pointer">🗑️ Limpiar semana</button>
       </div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px">
         <div style="background:#eff6ff;border-radius:8px;padding:10px;text-align:center"><div style="font-size:22px;font-weight:800;color:#1a56db">${total}</div><div style="font-size:11px;color:#3b82f6">Total</div></div>
